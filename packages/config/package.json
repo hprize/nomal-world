@@ -1,0 +1,13 @@
+{
+  "name": "@nestly/config",
+  "private": true,
+  "version": "0.0.0",
+  "exports": {
+    "./tailwind": "./tailwind.config.ts",
+    "./tsconfig": "./tsconfig.base.json"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0",
+    "tailwindcss-animate": "^1.0.7"
+  }
+}
