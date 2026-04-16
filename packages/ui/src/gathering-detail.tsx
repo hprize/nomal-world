@@ -11,6 +11,8 @@ interface GatheringDetailProps {
   editHref?: string;
   /** 편집 버튼 아래 추가 액션 (host용 - 공개/비공개 전환 등) */
   actionsSlot?: React.ReactNode;
+  /** 신청하기 버튼 슬롯 — 클릭 추적이 필요한 경우 주입 (user용) */
+  applySlot?: React.ReactNode;
 }
 
 function DetailItem({
@@ -35,7 +37,7 @@ function DetailItem({
   );
 }
 
-export function GatheringDetail({ gathering, editHref, actionsSlot }: GatheringDetailProps) {
+export function GatheringDetail({ gathering, editHref, actionsSlot, applySlot }: GatheringDetailProps) {
   const hasDesktopCta = gathering.google_form_url || editHref;
 
   return (
@@ -140,13 +142,11 @@ export function GatheringDetail({ gathering, editHref, actionsSlot }: GatheringD
               )}
 
               <div className="border-t pt-4 space-y-3">
-                {gathering.date && (
-                  <DetailItem
-                    icon={<Calendar className="w-5 h-5 text-primary-600" />}
-                    label="날짜"
-                    value={formatDate(gathering.date)}
-                  />
-                )}
+                <DetailItem
+                  icon={<Calendar className="w-5 h-5 text-primary-600" />}
+                  label="날짜"
+                  value={formatDate(gathering.date)}
+                />
                 {gathering.location && (
                   <DetailItem
                     icon={<MapPin className="w-5 h-5 text-primary-600" />}
@@ -179,7 +179,7 @@ export function GatheringDetail({ gathering, editHref, actionsSlot }: GatheringD
                     </a>
                   )}
                   {actionsSlot}
-                  {gathering.google_form_url ? (
+                  {applySlot ?? (gathering.google_form_url ? (
                     <a
                       href={gathering.google_form_url}
                       target="_blank"
@@ -195,7 +195,7 @@ export function GatheringDetail({ gathering, editHref, actionsSlot }: GatheringD
                     >
                       신청 준비 중
                     </button>
-                  ) : null}
+                  ) : null)}
                 </div>
               )}
             </div>

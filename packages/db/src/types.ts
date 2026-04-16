@@ -16,11 +16,6 @@ export interface Database {
         Insert: Omit<Gathering, "id" | "created_at" | "updated_at">;
         Update: Partial<Omit<Gathering, "id" | "created_at" | "updated_at">>;
       };
-      gathering_images: {
-        Row: GatheringImage;
-        Insert: Omit<GatheringImage, "id" | "created_at">;
-        Update: Partial<Omit<GatheringImage, "id" | "created_at">>;
-      };
     };
   };
 }
@@ -58,13 +53,6 @@ export interface Gathering {
   updated_at: string;
 }
 
-export interface GatheringImage {
-  id: string;
-  gathering_id: string;
-  url: string;
-  order_index: number;
-  created_at: string;
-}
 
 export interface EditorJSContent {
   time?: number;
@@ -82,4 +70,13 @@ export interface EditorJSBlock {
 /** Gathering with joined category */
 export interface GatheringWithCategory extends Gathering {
   category: Category | null;
+}
+
+export type GatheringEventType = "view" | "apply_click";
+
+export interface GatheringEvent {
+  id: string;
+  gathering_id: string;
+  event_type: GatheringEventType;
+  created_at: string;
 }
