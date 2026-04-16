@@ -83,3 +83,12 @@ export interface EditorJSBlock {
 export interface GatheringWithCategory extends Gathering {
   category: Category | null;
 }
+
+export type GatheringEventType = "view" | "apply_click";
+
+export interface GatheringEvent {
+  id: string;
+  gathering_id: string;
+  event_type: GatheringEventType;
+  created_at: string;
+}

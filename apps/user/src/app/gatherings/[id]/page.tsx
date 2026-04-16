@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createServerClient } from "@nomal-world/db/server";
 import { GatheringDetail } from "@nomal-world/ui/gathering-detail";
+import { ViewTracker } from "@/components/view-tracker";
+import { ApplyButton } from "@/components/apply-button";
 import type { GatheringWithCategory } from "@nomal-world/db/types";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +38,8 @@ export default async function GatheringDetailPage({
 
   return (
     <main className="min-h-screen bg-white">
+      <ViewTracker gatheringId={params.id} />
+
       {/* Back Navigation */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b">
         <div className="max-w-3xl lg:max-w-6xl mx-auto px-4 lg:px-6 py-4 flex items-center gap-3">
@@ -48,20 +52,32 @@ export default async function GatheringDetailPage({
         </div>
       </header>
 
-      <GatheringDetail gathering={gathering} />
-
-      {/* Fixed bottom CTA - Google Form link (모바일/태블릿 전용) */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-50">
-        <div className="max-w-3xl mx-auto">
-          {gathering.google_form_url ? (
-            <a
-              href={gathering.google_form_url}
-              target="_blank"
-              rel="noopener noreferrer"
+      <GatheringDetail
+        gathering={gathering}
+        applySlot={
+          gathering.google_form_url ? (
+            <ApplyButton
+              gatheringId={params.id}
+              url={gathering.google_form_url}
               className="block w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-6 rounded-xl transition-colors text-center"
             >
               신청하기
-            </a>
+            </ApplyButton>
+          ) : undefined
+        }
+      />
+
+      {/* Fixed bottom CTA (모바일/태블릿 전용) */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-50">
+        <div className="max-w-3xl mx-auto">
+          {gathering.google_form_url ? (
+            <ApplyButton
+              gatheringId={params.id}
+              url={gathering.google_form_url}
+              className="block w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-6 rounded-xl transition-colors text-center"
+            >
+              신청하기
+            </ApplyButton>
           ) : (
             <button
               disabled
