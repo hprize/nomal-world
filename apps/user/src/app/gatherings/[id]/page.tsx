@@ -37,7 +37,7 @@ export default async function GatheringDetailPage({
   }
 
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen bg-white pb-24 lg:pb-0">
       <ViewTracker gatheringId={params.id} />
 
       {/* Back Navigation */}

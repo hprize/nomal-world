@@ -31,7 +31,7 @@ export default async function GatheringViewPage({
   if (!gathering) notFound();
 
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen bg-white pb-24 lg:pb-0">
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b">
         <div className="max-w-3xl lg:max-w-6xl mx-auto px-4 lg:px-6 py-4 flex items-center gap-3">
           <Link href="/" className="text-muted-foreground hover:text-foreground shrink-0">
