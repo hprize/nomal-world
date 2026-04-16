@@ -142,13 +142,11 @@ export function GatheringDetail({ gathering, editHref, actionsSlot, applySlot }:
               )}
 
               <div className="border-t pt-4 space-y-3">
-                {gathering.date && (
-                  <DetailItem
-                    icon={<Calendar className="w-5 h-5 text-primary-600" />}
-                    label="날짜"
-                    value={formatDate(gathering.date)}
-                  />
-                )}
+                <DetailItem
+                  icon={<Calendar className="w-5 h-5 text-primary-600" />}
+                  label="날짜"
+                  value={formatDate(gathering.date)}
+                />
                 {gathering.location && (
                   <DetailItem
                     icon={<MapPin className="w-5 h-5 text-primary-600" />}
