@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@nestly/db/client";
-import { GatheringDetail } from "@nestly/ui/gathering-detail";
-import type { GatheringWithCategory } from "@nestly/db/types";
+import { createServerClient } from "@nomal-world/db/server";
+import { GatheringDetail } from "@nomal-world/ui/gathering-detail";
+import type { GatheringWithCategory } from "@nomal-world/db/types";
 
 export const dynamic = "force-dynamic";
 
 async function getGathering(id: string): Promise<GatheringWithCategory | null> {
   try {
-    const supabase = createClient();
+    const supabase = createServerClient();
     const { data, error } = await supabase
       .from("gatherings")
       .select("*, category:categories(*)")
@@ -38,7 +38,7 @@ export default async function GatheringDetailPage({
     <main className="min-h-screen bg-white">
       {/* Back Navigation */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-3">
+        <div className="max-w-3xl lg:max-w-6xl mx-auto px-4 lg:px-6 py-4 flex items-center gap-3">
           <Link href="/" className="text-muted-foreground hover:text-foreground">
             ← 뒤로
           </Link>
@@ -50,8 +50,8 @@ export default async function GatheringDetailPage({
 
       <GatheringDetail gathering={gathering} />
 
-      {/* Fixed bottom CTA - Google Form link */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-50">
+      {/* Fixed bottom CTA - Google Form link (모바일/태블릿 전용) */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-50">
         <div className="max-w-3xl mx-auto">
           {gathering.google_form_url ? (
             <a

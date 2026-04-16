@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ["@nestly/ui", "@nestly/db"],
+  transpilePackages: ["@nomal-world/ui", "@nomal-world/db"],
   images: {
     remotePatterns: [
       {
@@ -9,6 +9,27 @@ const nextConfig = {
         pathname: "/storage/v1/object/public/**",
       },
     ],
+  },
+  webpack(config) {
+    config.module.rules.push({
+      test: /\.svg$/,
+      use: [{
+        loader: "@svgr/webpack",
+        options: {
+          svgoConfig: {
+            plugins: [
+              {
+                name: "preset-default",
+                params: {
+                  overrides: { removeViewBox: false },
+                },
+              },
+            ],
+          },
+        },
+      }],
+    });
+    return config;
   },
 };
 

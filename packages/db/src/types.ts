@@ -73,8 +73,10 @@ export interface EditorJSContent {
 }
 
 export interface EditorJSBlock {
+  id?: string;
   type: string;
   data: Record<string, unknown>;
+  tunes?: Record<string, unknown>;
 }
 
 /** Gathering with joined category */

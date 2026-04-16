@@ -10,7 +10,8 @@ export function formatCost(cost: number): string {
   return `${cost.toLocaleString("ko-KR")}원`;
 }
 
-export function formatDate(dateStr: string): string {
+export function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "모집 종료 후 논의";
   const date = new Date(dateStr);
   return date.toLocaleDateString("ko-KR", {
     month: "long",

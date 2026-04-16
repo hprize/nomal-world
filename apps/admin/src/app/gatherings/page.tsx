@@ -1,4 +1,4 @@
-import { createServerClient } from "@nestly/db/server";
+import { createServerClient } from "@nomal-world/db/server";
 import { GatheringActions } from "@/components/gathering-actions";
 
 export const dynamic = "force-dynamic";
@@ -77,7 +77,7 @@ export default async function GatheringsManagePage({
         </form>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-50 border-b">
             <tr>

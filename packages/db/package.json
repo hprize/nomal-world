@@ -1,5 +1,5 @@
 {
-  "name": "@nestly/db",
+  "name": "@nomal-world/db",
   "version": "0.0.0",
   "private": true,
   "main": "./src/index.ts",

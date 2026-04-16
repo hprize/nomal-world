@@ -1,6 +1,6 @@
-import { createServerClient } from "@nestly/db/server";
+import { createServerClient } from "@nomal-world/db/server";
 import { UserRoleAction } from "@/components/user-role-action";
-import type { Profile } from "@nestly/db/types";
+import type { Profile } from "@nomal-world/db/types";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,7 @@ export default async function UsersManagePage() {
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-8">사용자 관리</h1>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-50 border-b">
             <tr>

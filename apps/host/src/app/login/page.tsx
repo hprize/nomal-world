@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@nestly/db/client";
+import { createClient } from "@nomal-world/db/client";
 import { useRouter } from "next/navigation";
+import { Logo } from "@nomal-world/ui/logo";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -39,10 +40,10 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-lg">
-        <h1 className="text-2xl font-bold text-center text-primary-600 mb-2">
-          Nestly 호스트
-        </h1>
+      <div className="w-full max-w-md p-8 bg-white rounded-2xl">
+        <div className="flex justify-center mb-2">
+          <Logo />
+        </div>
         <p className="text-center text-muted-foreground mb-8">
           모임장 로그인
         </p>

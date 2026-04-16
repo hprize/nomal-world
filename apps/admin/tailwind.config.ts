@@ -1,4 +1,4 @@
-import baseConfig from "@nestly/config/tailwind";
+import baseConfig from "@nomal-world/config/tailwind";
 import type { Config } from "tailwindcss";
 
 const config: Config = {

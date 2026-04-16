@@ -1,4 +1,4 @@
-import { createServerClient } from "@nestly/db/server";
+import { createServerClient } from "@nomal-world/db/server";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -39,22 +39,22 @@ export default async function AdminDashboard() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white rounded-xl p-6 shadow-sm">
+        <div className="bg-white rounded-xl p-6">
           <p className="text-sm text-muted-foreground">총 모임 수</p>
           <p className="text-3xl font-bold mt-2">{totalGatherings}</p>
         </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm">
+        <div className="bg-white rounded-xl p-6">
           <p className="text-sm text-muted-foreground">공개 모임</p>
           <p className="text-3xl font-bold mt-2">{publishedGatherings}</p>
         </div>
-        <div className="bg-white rounded-xl p-6 shadow-sm">
+        <div className="bg-white rounded-xl p-6">
           <p className="text-sm text-muted-foreground">등록 호스트</p>
           <p className="text-3xl font-bold mt-2">{totalHosts}</p>
         </div>
       </div>
 
       {/* Recent Gatherings */}
-      <div className="bg-white rounded-xl shadow-sm">
+      <div className="bg-white rounded-xl">
         <div className="p-6 border-b">
           <h2 className="font-semibold">최근 모임</h2>
         </div>

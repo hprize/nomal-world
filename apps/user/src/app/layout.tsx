@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Nestly - 새로운 모임을 발견하세요",
+  title: "Nomal World - 말도 안되는 세상",
   description: "관심사가 비슷한 사람들과 함께하는 소셜 모임 플랫폼",
 };
 

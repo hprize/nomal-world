@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createServerClient } from "@nestly/db/server";
+import { createServerClient } from "@nomal-world/db/server";
 import { GatheringForm } from "@/components/gathering-form";
-import type { Gathering, Category } from "@nestly/db/types";
+import { DeleteGatheringButton } from "@/components/delete-gathering-button";
+import type { Gathering, Category } from "@nomal-world/db/types";
 
 export const dynamic = "force-dynamic";
 
@@ -43,12 +44,21 @@ export default async function EditGatheringPage({
         </div>
       </header>
 
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
         <GatheringForm
           mode="edit"
           gathering={gathering}
           categories={categories}
         />
+
+        {/* 위험 구역 */}
+        <div className="border border-red-200 rounded-xl p-6 space-y-3">
+          <h2 className="text-sm font-semibold text-red-600">위험 구역</h2>
+          <p className="text-sm text-muted-foreground">
+            모임을 삭제하면 모든 정보가 영구적으로 제거되며 복구할 수 없습니다.
+          </p>
+          <DeleteGatheringButton gatheringId={params.id} />
+        </div>
       </div>
     </main>
   );

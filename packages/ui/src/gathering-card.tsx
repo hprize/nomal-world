@@ -1,7 +1,7 @@
 import * as React from "react";
 import { cn, formatCost, formatDate } from "./lib/utils";
 import { Badge } from "./components/badge";
-import type { GatheringWithCategory } from "@nestly/db/types";
+import type { GatheringWithCategory } from "@nomal-world/db/types";
 import { Calendar, MapPin, Users } from "lucide-react";
 
 interface GatheringCardProps {
@@ -24,17 +24,17 @@ export function GatheringCard({
       href={href}
       onClick={onClick}
       className={cn(
-        "group rounded-xl border bg-card overflow-hidden transition-shadow hover:shadow-md",
+        "group bg-card",
         (href || onClick) && "cursor-pointer"
       )}
     >
       {/* Thumbnail */}
-      <div className="relative aspect-[4/3] bg-muted overflow-hidden">
+      <div className="relative aspect-[4/3] bg-muted overflow-hidden rounded-xl">
         {gathering.thumbnail_url ? (
           <img
             src={gathering.thumbnail_url}
             alt={gathering.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
@@ -63,7 +63,7 @@ export function GatheringCard({
       </div>
 
       {/* Content */}
-      <div className="p-4 space-y-2">
+      <div className="pt-3 space-y-2">
         {gathering.category && (
           <Badge variant="default">{gathering.category.name}</Badge>
         )}
@@ -76,12 +76,10 @@ export function GatheringCard({
           </p>
         )}
         <div className="flex flex-col gap-1 pt-1 text-sm text-muted-foreground">
-          {gathering.date && (
-            <div className="flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5" />
-              <span>{formatDate(gathering.date)}</span>
-            </div>
-          )}
+          <div className="flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5" />
+            <span>{formatDate(gathering.date)}</span>
+          </div>
           {gathering.location && (
             <div className="flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5" />

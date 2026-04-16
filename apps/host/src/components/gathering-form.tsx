@@ -2,8 +2,9 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@nestly/db/client";
-import type { Gathering, Category, EditorJSContent } from "@nestly/db/types";
+import { createClient } from "@nomal-world/db/client";
+import { updateGathering } from "@/app/actions/gathering";
+import type { Gathering, Category, EditorJSContent } from "@nomal-world/db/types";
 import dynamic from "next/dynamic";
 
 const ContentEditor = dynamic(() => import("./content-editor"), { ssr: false });
@@ -20,6 +21,7 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
   const [error, setError] = useState("");
   const editorContentRef = useRef<EditorJSContent | null>(gathering?.content || null);
 
+  const [dateTbd, setDateTbd] = useState(!gathering?.date);
   const [form, setForm] = useState({
     title: gathering?.title || "",
     summary: gathering?.summary || "",
@@ -81,7 +83,7 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
         title: form.title,
         summary: form.summary || null,
         category_id: form.category_id || null,
-        date: form.date ? new Date(form.date).toISOString() : null,
+        date: (!dateTbd && form.date) ? new Date(form.date).toISOString() : null,
         location: form.location || null,
         capacity: form.capacity ? parseInt(form.capacity) : null,
         cost: parseInt(form.cost) || 0,
@@ -97,17 +99,13 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
           .insert({ ...gatheringData, host_id: user.id });
 
         if (error) throw error;
+        router.push("/");
+        router.refresh();
       } else if (gathering) {
-        const { error } = await supabase
-          .from("gatherings")
-          .update(gatheringData)
-          .eq("id", gathering.id);
-
-        if (error) throw error;
+        await updateGathering(gathering.id, gatheringData);
+        router.push("/");
+        router.refresh();
       }
-
-      router.push("/");
-      router.refresh();
     } catch {
       setError("저장 중 오류가 발생했습니다.");
     } finally {
@@ -128,7 +126,7 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
       )}
 
       {/* 기본 정보 */}
-      <section className="bg-white rounded-xl p-6 shadow-sm space-y-4">
+      <section className="bg-white rounded-xl p-6 space-y-4">
         <h2 className="font-semibold text-lg">기본 정보</h2>
 
         <div>
@@ -175,13 +173,39 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">날짜</label>
-            <input
-              type="datetime-local"
-              name="date"
-              value={form.date}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
+            <div className="flex rounded-lg border overflow-hidden mb-2">
+              <button
+                type="button"
+                onClick={() => setDateTbd(false)}
+                className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                  !dateTbd
+                    ? "bg-primary-600 text-white"
+                    : "bg-white text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                날짜 지정
+              </button>
+              <button
+                type="button"
+                onClick={() => setDateTbd(true)}
+                className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                  dateTbd
+                    ? "bg-primary-600 text-white"
+                    : "bg-white text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                모집 종료 후 논의
+              </button>
+            </div>
+            {!dateTbd && (
+              <input
+                type="datetime-local"
+                name="date"
+                value={form.date}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">장소</label>
@@ -234,7 +258,7 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
       </section>
 
       {/* 대표 이미지 */}
-      <section className="bg-white rounded-xl p-6 shadow-sm space-y-4">
+      <section className="bg-white rounded-xl p-6 space-y-4">
         <h2 className="font-semibold text-lg">대표 이미지</h2>
         {form.thumbnail_url && (
           <img
@@ -252,7 +276,7 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
       </section>
 
       {/* 상세 소개 (Editor.js) */}
-      <section className="bg-white rounded-xl p-6 shadow-sm space-y-4">
+      <section className="bg-white rounded-xl p-6 space-y-4">
         <h2 className="font-semibold text-lg">상세 소개</h2>
         <ContentEditor
           initialData={gathering?.content || undefined}

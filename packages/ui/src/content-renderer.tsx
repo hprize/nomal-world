@@ -1,8 +1,15 @@
 import * as React from "react";
-import type { EditorJSContent } from "@nestly/db/types";
+import type { EditorJSContent } from "@nomal-world/db/types";
 
 interface ContentRendererProps {
   content: EditorJSContent;
+}
+
+function getAlignment(block: EditorJSContent["blocks"][number]): string {
+  const alignment = (block.tunes as any)?.alignmentBlockTune?.alignment;
+  if (alignment === "center") return "text-center";
+  if (alignment === "right") return "text-right";
+  return "text-left";
 }
 
 export function ContentRenderer({ content }: ContentRendererProps) {
@@ -22,7 +29,7 @@ export function ContentRenderer({ content }: ContentRendererProps) {
             return (
               <p
                 key={index}
-                className="text-base leading-relaxed"
+                className={`text-base leading-relaxed ${getAlignment(block)}`}
                 dangerouslySetInnerHTML={{
                   __html: (block.data.text as string) || "",
                 }}
@@ -35,13 +42,13 @@ export function ContentRenderer({ content }: ContentRendererProps) {
             return (
               <Tag
                 key={index}
-                className={
+                className={`${
                   level === 1
                     ? "text-2xl font-bold"
                     : level === 2
                     ? "text-xl font-bold"
                     : "text-lg font-semibold"
-                }
+                } ${getAlignment(block)}`}
                 dangerouslySetInnerHTML={{
                   __html: (block.data.text as string) || "",
                 }}
@@ -53,13 +60,19 @@ export function ContentRenderer({ content }: ContentRendererProps) {
             const file = block.data.file as { url: string } | undefined;
             const url = file?.url || (block.data.url as string);
             const caption = block.data.caption as string;
+            const width = (block.tunes as any)?.imageSizeTune?.width as string | undefined;
+            const hasSizeConstraint = width && width !== "100%";
             return (
-              <figure key={index} className="my-6">
+              <figure
+                key={index}
+                className="my-6"
+                style={hasSizeConstraint ? { maxWidth: width, margin: "0 auto" } : undefined}
+              >
                 {url && (
                   <img
                     src={url}
                     alt={caption || ""}
-                    className="w-full rounded-lg"
+                    className="w-full"
                   />
                 )}
                 {caption && (

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@nestly/db/client";
+import { createClient } from "@nomal-world/db/client";
 import { useRouter } from "next/navigation";
+import { Logo } from "@nomal-world/ui/logo";
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
@@ -39,8 +40,10 @@ export default function AdminLoginPage() {
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gray-900">
-      <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-lg">
-        <h1 className="text-2xl font-bold text-center mb-2">Nestly 관리자</h1>
+      <div className="w-full max-w-md p-8 bg-white rounded-2xl">
+        <div className="flex justify-center mb-2">
+          <Logo />
+        </div>
         <p className="text-center text-muted-foreground mb-8">관리자 로그인</p>
 
         <form onSubmit={handleLogin} className="space-y-4">
@@ -56,7 +59,7 @@ export default function AdminLoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="admin@nestly.kr"
+              placeholder="admin@nomalworld.kr"
               required
             />
           </div>

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Nestly 호스트 - 모임 관리",
-  description: "Nestly 모임을 만들고 관리하세요",
+  title: "Nomal World 호스트 - 모임 관리",
+  description: "Nomal World 모임을 만들고 관리하세요",
 };
 
 export default function RootLayout({

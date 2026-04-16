@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { createClient } from "@nestly/db/client";
+import { useState } from "react";
+import { updateUserRole } from "@/app/actions/user";
 
 interface UserRoleActionProps {
   userId: string;
@@ -9,7 +9,7 @@ interface UserRoleActionProps {
 }
 
 export function UserRoleAction({ userId, currentRole }: UserRoleActionProps) {
-  const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
   const toggleRole = async () => {
     const newRole = currentRole === "admin" ? "host" : "admin";
@@ -17,17 +17,23 @@ export function UserRoleAction({ userId, currentRole }: UserRoleActionProps) {
 
     if (!confirm(`이 사용자를 ${label}(으)로 변경하시겠습니까?`)) return;
 
-    const supabase = createClient();
-    await supabase.from("profiles").update({ role: newRole }).eq("id", userId);
-    router.refresh();
+    setLoading(true);
+    try {
+      await updateUserRole(userId, newRole);
+    } catch {
+      alert("역할 변경 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <button
       onClick={toggleRole}
-      className="text-xs px-2 py-1 bg-gray-50 text-gray-700 rounded hover:bg-gray-100 transition-colors"
+      disabled={loading}
+      className="text-xs px-2 py-1 bg-gray-50 text-gray-700 rounded hover:bg-gray-100 transition-colors disabled:opacity-50"
     >
-      {currentRole === "admin" ? "호스트로 변경" : "관리자로 변경"}
+      {loading ? "변경 중..." : currentRole === "admin" ? "호스트로 변경" : "관리자로 변경"}
     </button>
   );
 }

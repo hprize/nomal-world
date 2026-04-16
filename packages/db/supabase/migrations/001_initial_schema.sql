@@ -1,4 +1,4 @@
--- Nestly MVP Initial Schema
+-- NomalWorld MVP Initial Schema
 
 -- 카테고리
 CREATE TABLE categories (

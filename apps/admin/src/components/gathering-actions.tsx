@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { createClient } from "@nestly/db/client";
+import { deleteGathering, updateGatheringStatus } from "@/app/actions/gathering";
 
 interface GatheringActionsProps {
   gatheringId: string;
@@ -11,28 +11,30 @@ interface GatheringActionsProps {
 export function GatheringActions({ gatheringId, currentStatus }: GatheringActionsProps) {
   const router = useRouter();
 
-  const updateStatus = async (newStatus: "draft" | "published" | "closed") => {
-    const supabase = createClient();
-    await supabase
-      .from("gatherings")
-      .update({ status: newStatus })
-      .eq("id", gatheringId);
-    router.refresh();
+  const handleStatusChange = async (newStatus: "draft" | "published" | "closed") => {
+    try {
+      await updateGatheringStatus(gatheringId, newStatus);
+      router.refresh();
+    } catch {
+      alert("상태 변경 중 오류가 발생했습니다.");
+    }
   };
 
   const handleDelete = async () => {
-    if (!confirm("정말 이 모임을 삭제하시겠습니까?")) return;
-
-    const supabase = createClient();
-    await supabase.from("gatherings").delete().eq("id", gatheringId);
-    router.refresh();
+    if (!confirm("정말 이 모임을 삭제하시겠습니까?\n삭제된 모임은 복구할 수 없습니다.")) return;
+    try {
+      await deleteGathering(gatheringId);
+      router.refresh();
+    } catch {
+      alert("삭제 중 오류가 발생했습니다.");
+    }
   };
 
   return (
     <div className="flex gap-2">
       {currentStatus !== "published" && (
         <button
-          onClick={() => updateStatus("published")}
+          onClick={() => handleStatusChange("published")}
           className="text-xs px-2 py-1 bg-green-50 text-green-700 rounded hover:bg-green-100 transition-colors"
         >
           공개
@@ -40,7 +42,7 @@ export function GatheringActions({ gatheringId, currentStatus }: GatheringAction
       )}
       {currentStatus !== "closed" && (
         <button
-          onClick={() => updateStatus("closed")}
+          onClick={() => handleStatusChange("closed")}
           className="text-xs px-2 py-1 bg-yellow-50 text-yellow-700 rounded hover:bg-yellow-100 transition-colors"
         >
           마감
@@ -48,7 +50,7 @@ export function GatheringActions({ gatheringId, currentStatus }: GatheringAction
       )}
       {currentStatus !== "draft" && (
         <button
-          onClick={() => updateStatus("draft")}
+          onClick={() => handleStatusChange("draft")}
           className="text-xs px-2 py-1 bg-gray-50 text-gray-700 rounded hover:bg-gray-100 transition-colors"
         >
           비공개

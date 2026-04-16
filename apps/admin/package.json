@@ -1,5 +1,5 @@
 {
-  "name": "@nestly/admin",
+  "name": "@nomal-world/admin",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -9,17 +9,18 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@nestly/ui": "workspace:*",
-    "@nestly/db": "workspace:*",
-    "@supabase/supabase-js": "^2.49.0",
+    "@nomal-world/db": "workspace:*",
+    "@nomal-world/ui": "workspace:*",
     "@supabase/ssr": "^0.5.0",
+    "@supabase/supabase-js": "^2.49.0",
+    "lucide-react": "^0.474.0",
     "next": "^14.2.0",
     "react": "^18.3.0",
-    "react-dom": "^18.3.0",
-    "lucide-react": "^0.474.0"
+    "react-dom": "^18.3.0"
   },
   "devDependencies": {
-    "@nestly/config": "workspace:*",
+    "@nomal-world/config": "workspace:*",
+    "@svgr/webpack": "^8.1.0",
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",

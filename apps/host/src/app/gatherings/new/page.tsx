@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { createServerClient } from "@nestly/db/server";
+import { createServerClient } from "@nomal-world/db/server";
 import { GatheringForm } from "@/components/gathering-form";
-import type { Category } from "@nestly/db/types";
+import type { Category } from "@nomal-world/db/types";
 
 export const dynamic = "force-dynamic";
 
