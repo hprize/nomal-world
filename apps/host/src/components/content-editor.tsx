@@ -77,13 +77,17 @@ export default function ContentEditor({ initialData, onChange }: ContentEditorPr
     return { success: 0, error: "Unsupported URL scheme" };
   }, [uploadImage]);
 
-  // macOS attachment: URL 붙여넣기 전용 핸들러 (캡처 단계로 Editor.js보다 먼저 실행)
-  const handleAttachmentPaste = useCallback(async (event: Event) => {
+  // Notion 붙여넣기 통합 핸들러 (캡처 단계로 Editor.js보다 먼저 실행)
+  // 처리 대상: notionvc 주석 또는 attachment: URL 이 포함된 HTML (Notion 출처 판별)
+  // 비노션 출처(구글 독스, 웹페이지 등)는 return → Editor.js 기본 동작 유지
+  const handleNotionPaste = useCallback(async (event: Event) => {
     const clipEvent = event as ClipboardEvent;
     const html = clipEvent.clipboardData?.getData("text/html") || "";
-    if (!html.includes("attachment:")) return; // attachment: 없으면 Editor.js가 처리
 
-    // preventDefault 전에 파일 수집 — 바이너리 없으면 Editor.js에 위임
+    const isNotion = html.includes("notionvc:") || html.includes("attachment:");
+    if (!isNotion) return;
+
+    // 이미지 바이너리 파일 수집
     const imageFiles: File[] = [];
     for (const item of Array.from(clipEvent.clipboardData?.items ?? [])) {
       if (item.kind === "file" && item.type.startsWith("image/")) {
@@ -91,10 +95,10 @@ export default function ContentEditor({ initialData, onChange }: ContentEditorPr
         if (file) imageFiles.push(file);
       }
     }
-    // Notion 블록 복사 시 이미지 바이너리가 clipboard에 없는 경우:
-    // Editor.js에 위임하면 uploadByUrl("attachment:...")를 시도하다 실패하지만
-    // 텍스트는 유지되고 사용자가 이미지 실패를 인식할 수 있음
-    if (imageFiles.length === 0) return;
+
+    // attachment: URL만 있고 바이너리도 없으며 notionvc도 없는 경우 → Editor.js에 위임
+    // (텍스트는 유지되고 이미지 실패만 발생하는 기존 동작 유지)
+    if (html.includes("attachment:") && imageFiles.length === 0 && !html.includes("notionvc:")) return;
 
     event.preventDefault();
     event.stopPropagation();
@@ -102,24 +106,30 @@ export default function ContentEditor({ initialData, onChange }: ContentEditorPr
     const editor = editorRef.current;
     if (!editor) return;
 
-    // HTML을 파싱해 블록 순서대로 처리
     const doc = new DOMParser().parseFromString(html, "text/html");
     let imgIndex = 0;
 
     for (const node of Array.from(doc.body.childNodes)) {
+      // HTML 주석(notionvc 등) 스킵
+      if (node.nodeType === Node.COMMENT_NODE) continue;
+
       if (node.nodeType === Node.TEXT_NODE) {
-        const text = node.textContent?.trim();
+        const text = (node.textContent ?? "").trim();
         if (text) editor.blocks.insert("paragraph", { text });
         continue;
       }
       if (!(node instanceof Element)) continue;
 
-      const imgEl =
-        node.tagName === "IMG" ? node : node.querySelector("img[src^='attachment:']");
+      const tag = node.tagName.toLowerCase();
 
-      if (imgEl) {
-        const file = imageFiles[imgIndex++];
-        if (file) {
+      if (tag === "p") {
+        // attachment: 이미지가 <p> 안에 있는 경우
+        const imgEl = node.tagName === "IMG"
+          ? node
+          : node.querySelector("img[src^='attachment:']");
+
+        if (imgEl && imageFiles[imgIndex]) {
+          const file = imageFiles[imgIndex++];
           const result = await uploadImage(file);
           if (result.success === 1) {
             editor.blocks.insert("image", {
@@ -130,13 +140,35 @@ export default function ContentEditor({ initialData, onChange }: ContentEditorPr
               stretched: false,
             });
           }
+          imgEl.remove();
+          const remaining = node.innerHTML.trim();
+          // 남은 텍스트도 \n → <br> 정규화
+          if (remaining) editor.blocks.insert("paragraph", { text: remaining.replace(/\n/g, "<br>") });
+        } else {
+          // 핵심 수정: <p> 안의 \n을 <br>로 치환해 contenteditable 커서 오동작 방지
+          const content = node.innerHTML.replace(/\n/g, "<br>");
+          if (content.trim()) editor.blocks.insert("paragraph", { text: content });
         }
-        // 같은 블록 안의 나머지 텍스트 처리
-        imgEl.remove();
-        const remaining = (node as Element).innerHTML.trim();
-        if (remaining) editor.blocks.insert("paragraph", { text: remaining });
+      } else if (tag === "ul" || tag === "ol") {
+        // @editorjs/list v1.10: items는 { content: string, items: [] }[] (nested list format)
+        // :scope > li 로 직접 자식만 선택해 중첩 li 중복 방지
+        const items = Array.from(node.querySelectorAll(":scope > li")).map((li) => ({
+          content: li.innerHTML,
+          items: [],
+        }));
+        if (items.length > 0) {
+          editor.blocks.insert("list", {
+            style: tag === "ol" ? "ordered" : "unordered",
+            items,
+          });
+        }
+      } else if (/^h[1-6]$/.test(tag)) {
+        // 에디터 설정이 level 2~3만 허용하므로 클램프
+        const level = Math.min(Math.max(parseInt(tag[1]), 2), 3);
+        editor.blocks.insert("header", { text: node.innerHTML, level });
       } else {
-        const text = (node as Element).innerHTML.trim();
+        // 그 외 태그 → 텍스트가 있으면 paragraph로 fallback
+        const text = node.innerHTML.trim();
         if (text) editor.blocks.insert("paragraph", { text });
       }
     }
@@ -145,9 +177,9 @@ export default function ContentEditor({ initialData, onChange }: ContentEditorPr
   useEffect(() => {
     const holder = holderRef.current;
     if (!holder) return;
-    holder.addEventListener("paste", handleAttachmentPaste, true);
-    return () => holder.removeEventListener("paste", handleAttachmentPaste, true);
-  }, [handleAttachmentPaste]);
+    holder.addEventListener("paste", handleNotionPaste, true);
+    return () => holder.removeEventListener("paste", handleNotionPaste, true);
+  }, [handleNotionPaste]);
 
   useEffect(() => {
     if (!holderRef.current || editorRef.current) return;

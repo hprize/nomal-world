@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { createServerClient } from "@nomal-world/db/server";
 import { GatheringDetail } from "@nomal-world/ui/gathering-detail";
@@ -35,7 +36,7 @@ export default async function GatheringViewPage({
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b">
         <div className="max-w-3xl lg:max-w-6xl mx-auto px-4 lg:px-6 py-4 flex items-center gap-3">
           <Link href="/" className="text-muted-foreground hover:text-foreground shrink-0">
-            ← 뒤로
+            <ArrowLeft className="w-6 h-6" />
           </Link>
           <span className="text-lg font-semibold line-clamp-1 flex-1">
             {gathering.title}

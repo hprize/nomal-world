@@ -1,25 +1,42 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const CATEGORIES = [
   { slug: "all", name: "전체" },
-  { slug: "outdoor", name: "아웃도어" },
-  { slug: "culture", name: "문화·예술" },
-  { slug: "food", name: "맛집·카페" },
-  { slug: "sports", name: "운동·스포츠" },
-  { slug: "study", name: "스터디" },
-  { slug: "hobby", name: "취미" },
-  { slug: "social", name: "소셜" },
-  { slug: "travel", name: "여행" },
+  { slug: "photo-video", name: "사진 · 영상" },
+  { slug: "music-performance", name: "음악 · 공연" },
+  { slug: "art-design-craft", name: "미술 · 디자인 · 만들기" },
+  { slug: "writing-reading", name: "글쓰기 · 독서 · 인문" },
+  { slug: "fandom", name: "취향 · 덕질" },
+  { slug: "sports", name: "스포츠 · 신체활동" },
+  { slug: "game", name: "게임 · 두뇌" },
+  { slug: "food-baking", name: "음식 · 베이킹" },
+  { slug: "fashion-beauty", name: "패션 · 뷰티" },
+  { slug: "healing", name: "힐링 · 마음" },
+  { slug: "social", name: "관계 · 친목" },
+  { slug: "career-growth", name: "진로 · 공부 · 성장" },
+  { slug: "recreation", name: "레크레이션 · 놀이" },
+  { slug: "challenge", name: "대회 · 챌린지" },
 ];
 
 export function CategoryFilter() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const selected = searchParams.get("category") || "all";
+  const urlCategory = searchParams.get("category") || "all";
+
+  // 클릭 즉시 UI 반영 (서버 응답 전에도 선택된 것처럼 보임)
+  const [optimistic, setOptimistic] = useState<string | null>(null);
+  const selected = optimistic ?? urlCategory;
+
+  // 네비게이션 완료 후 optimistic 상태 초기화
+  useEffect(() => {
+    setOptimistic(null);
+  }, [urlCategory]);
 
   const handleSelect = (slug: string) => {
+    setOptimistic(slug);
     if (slug === "all") {
       router.push("/");
     } else {

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { createServerClient } from "@nomal-world/db/server";
 import { GatheringDetail } from "@nomal-world/ui/gathering-detail";
@@ -36,6 +37,19 @@ export default async function GatheringDetailPage({
     notFound();
   }
 
+  const now = new Date();
+  const recruitStart = gathering.recruitment_start ? new Date(gathering.recruitment_start) : null;
+  const recruitEnd = gathering.recruitment_end ? new Date(gathering.recruitment_end) : null;
+  const isBeforeRecruitment = recruitStart !== null && now < recruitStart;
+  const isAfterRecruitment = recruitEnd !== null && now > recruitEnd;
+  const isRecruitmentActive = !isBeforeRecruitment && !isAfterRecruitment;
+
+  const applyDisabledLabel = isBeforeRecruitment
+    ? `모집 시작 전 (${recruitStart!.toLocaleDateString("ko-KR")} 시작)`
+    : isAfterRecruitment
+    ? "모집 마감"
+    : null;
+
   return (
     <main className="min-h-screen bg-white pb-24 lg:pb-0">
       <ViewTracker gatheringId={params.id} />
@@ -44,7 +58,7 @@ export default async function GatheringDetailPage({
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b">
         <div className="max-w-3xl lg:max-w-6xl mx-auto px-4 lg:px-6 py-4 flex items-center gap-3">
           <Link href="/" className="text-muted-foreground hover:text-foreground">
-            ← 뒤로
+            <ArrowLeft className="w-6 h-6" />
           </Link>
           <span className="text-lg font-semibold line-clamp-1">
             {gathering.title}
@@ -55,7 +69,7 @@ export default async function GatheringDetailPage({
       <GatheringDetail
         gathering={gathering}
         applySlot={
-          gathering.google_form_url ? (
+          gathering.google_form_url && isRecruitmentActive ? (
             <ApplyButton
               gatheringId={params.id}
               url={gathering.google_form_url}
@@ -63,6 +77,13 @@ export default async function GatheringDetailPage({
             >
               신청하기
             </ApplyButton>
+          ) : applyDisabledLabel || !gathering.google_form_url ? (
+            <button
+              disabled
+              className="w-full bg-gray-300 text-gray-500 font-semibold py-3 px-6 rounded-xl cursor-not-allowed"
+            >
+              {applyDisabledLabel ?? "신청 준비 중"}
+            </button>
           ) : undefined
         }
       />
@@ -70,7 +91,7 @@ export default async function GatheringDetailPage({
       {/* Fixed bottom CTA (모바일/태블릿 전용) */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-50">
         <div className="max-w-3xl mx-auto">
-          {gathering.google_form_url ? (
+          {gathering.google_form_url && isRecruitmentActive ? (
             <ApplyButton
               gatheringId={params.id}
               url={gathering.google_form_url}
@@ -83,7 +104,7 @@ export default async function GatheringDetailPage({
               disabled
               className="w-full bg-gray-300 text-gray-500 font-semibold py-3 px-6 rounded-xl cursor-not-allowed"
             >
-              신청 준비 중
+              {applyDisabledLabel ?? "신청 준비 중"}
             </button>
           )}
         </div>

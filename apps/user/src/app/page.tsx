@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { GatheringCard } from "@nomal-world/ui/gathering-card";
 import { Logo } from "@nomal-world/ui/logo";
 import { CategoryFilter } from "@/components/category-filter";
@@ -52,7 +53,9 @@ export default async function HomePage({
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b">
         <div className="max-w-6xl mx-auto px-4 py-4">
-          <Logo />
+          <Link href="/">
+            <Logo />
+          </Link>
           <p className="text-sm text-muted-foreground mt-1">
             말도 안되는 세상
           </p>
@@ -67,7 +70,7 @@ export default async function HomePage({
       {/* Gathering Grid */}
       <section className="max-w-6xl mx-auto px-4 pb-12">
         {gatherings.length > 0 ? (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-6 lg:gap-6">
             {gatherings.map((gathering) => (
               <GatheringCard
                 key={gathering.id}
