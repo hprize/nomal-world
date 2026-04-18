@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { createServerClient } from "@nomal-world/db/server";
 import { GatheringForm } from "@/components/gathering-form";
 import type { Category } from "@nomal-world/db/types";
@@ -24,7 +25,7 @@ export default async function CreateGatheringPage() {
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center gap-3">
           <Link href="/" className="text-muted-foreground hover:text-foreground">
-            ← 뒤로
+            <ArrowLeft className="w-6 h-6" />
           </Link>
           <h1 className="text-lg font-semibold">새로운 모임 생성</h1>
         </div>

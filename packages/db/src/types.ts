@@ -48,6 +48,8 @@ export interface Gathering {
   capacity: number | null;
   cost: number;
   google_form_url: string | null;
+  recruitment_start: string | null;
+  recruitment_end: string | null;
   status: "draft" | "published" | "closed";
   created_at: string;
   updated_at: string;

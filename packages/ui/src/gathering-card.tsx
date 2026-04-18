@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn, formatCost, formatDate } from "./lib/utils";
+import { cn, formatCost, formatDate, getDdayCount } from "./lib/utils";
 import { Badge } from "./components/badge";
 import type { GatheringWithCategory } from "@nomal-world/db/types";
 import { Calendar, MapPin, Users } from "lucide-react";
@@ -18,13 +18,14 @@ export function GatheringCard({
   showStatus = false,
 }: GatheringCardProps) {
   const Wrapper = href ? "a" : "div";
+  const dday = getDdayCount(gathering.recruitment_end ?? null);
 
   return (
     <Wrapper
       href={href}
       onClick={onClick}
       className={cn(
-        "group bg-card",
+        "group bg-card flex flex-col",
         (href || onClick) && "cursor-pointer"
       )}
     >
@@ -41,31 +42,38 @@ export function GatheringCard({
             <span className="text-4xl">🎉</span>
           </div>
         )}
-        {showStatus && (
-          <div className="absolute top-3 right-3">
-            <Badge
-              variant={
-                gathering.status === "published"
-                  ? "success"
+        {(showStatus || dday !== null) && (
+          <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
+            {showStatus && (
+              <Badge
+                variant={
+                  gathering.status === "published"
+                    ? "success"
+                    : gathering.status === "closed"
+                    ? "destructive"
+                    : "secondary"
+                }
+              >
+                {gathering.status === "published"
+                  ? "공개"
                   : gathering.status === "closed"
-                  ? "destructive"
-                  : "secondary"
-              }
-            >
-              {gathering.status === "published"
-                ? "공개"
-                : gathering.status === "closed"
-                ? "마감"
-                : "초안"}
-            </Badge>
+                  ? "마감"
+                  : "초안"}
+              </Badge>
+            )}
+            {dday !== null && (
+              <Badge variant="destructive">
+                {dday === 0 ? "D-Day" : `D-${dday}`}
+              </Badge>
+            )}
           </div>
         )}
       </div>
 
       {/* Content */}
-      <div className="pt-3 space-y-2">
+      <div className="pt-3 flex flex-col flex-1 gap-2">
         {gathering.category && (
-          <Badge variant="default">{gathering.category.name}</Badge>
+          <Badge variant="default" className="self-start">{gathering.category.name}</Badge>
         )}
         <h3 className="font-semibold text-base line-clamp-2">
           {gathering.title}
@@ -75,7 +83,7 @@ export function GatheringCard({
             {gathering.summary}
           </p>
         )}
-        <div className="flex flex-col gap-1 pt-1 text-sm text-muted-foreground">
+        <div className="flex flex-col gap-1 text-sm text-muted-foreground">
           <div className="flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5" />
             <span>{formatDate(gathering.date)}</span>
@@ -87,7 +95,9 @@ export function GatheringCard({
             </div>
           )}
         </div>
-        <div className="flex items-center justify-between pt-2 border-t">
+        {/* spacer: 가격/인원 영역을 카드 하단에 고정 */}
+        <div className="flex-1" />
+        <div className="pt-2 border-t flex items-center justify-between">
           <span className="font-semibold text-primary-600">
             {formatCost(gathering.cost)}
           </span>

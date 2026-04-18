@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { createServerClient } from "@nomal-world/db/server";
 import { GatheringForm } from "@/components/gathering-form";
@@ -38,7 +39,7 @@ export default async function EditGatheringPage({
             href={`/gatherings/${params.id}`}
             className="text-muted-foreground hover:text-foreground"
           >
-            ← 뒤로
+            <ArrowLeft className="w-6 h-6" />
           </Link>
           <h1 className="text-lg font-semibold">모임 편집</h1>
         </div>

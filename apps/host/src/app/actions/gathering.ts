@@ -67,6 +67,8 @@ export type GatheringUpdateData = {
   capacity: number | null;
   cost: number;
   google_form_url: string | null;
+  recruitment_start: string | null;
+  recruitment_end: string | null;
   thumbnail_url: string | null;
   content: EditorJSContent | null;
   status: "draft" | "published";
@@ -126,6 +128,8 @@ export async function updateGathering(
       capacity: data.capacity,
       cost: data.cost,
       google_form_url: data.google_form_url,
+      recruitment_start: data.recruitment_start,
+      recruitment_end: data.recruitment_end,
       thumbnail_url: data.thumbnail_url,
       content: data.content as unknown,
       status: data.status,

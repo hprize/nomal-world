@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Badge } from "./components/badge";
 import { ContentRenderer } from "./content-renderer";
-import { formatCost, formatDate } from "./lib/utils";
+import { formatCost, formatDate, formatRecruitmentPeriod } from "./lib/utils";
 import type { GatheringWithCategory } from "@nomal-world/db/types";
 import { Calendar, MapPin, Users, Banknote } from "lucide-react";
 
@@ -66,7 +66,12 @@ export function GatheringDetail({ gathering, editHref, actionsSlot, applySlot }:
               {gathering.category.name}
             </Badge>
           )}
-          <h1 className="text-2xl font-bold mb-2">{gathering.title}</h1>
+          <h1 className="text-2xl font-bold mb-1">{gathering.title}</h1>
+          {(gathering.recruitment_start || gathering.recruitment_end) && (
+            <p className="text-sm text-muted-foreground mb-2">
+              모집 기간: {formatRecruitmentPeriod(gathering.recruitment_start, gathering.recruitment_end)}
+            </p>
+          )}
           {gathering.summary && (
             <p className="text-muted-foreground">{gathering.summary}</p>
           )}
@@ -137,6 +142,11 @@ export function GatheringDetail({ gathering, editHref, actionsSlot, applySlot }:
                 <Badge variant="default">{gathering.category.name}</Badge>
               )}
               <h1 className="text-xl font-bold leading-snug">{gathering.title}</h1>
+              {(gathering.recruitment_start || gathering.recruitment_end) && (
+                <p className="text-xs text-muted-foreground -mt-2">
+                  모집 기간: {formatRecruitmentPeriod(gathering.recruitment_start, gathering.recruitment_end)}
+                </p>
+              )}
               {gathering.summary && (
                 <p className="text-sm text-muted-foreground">{gathering.summary}</p>
               )}

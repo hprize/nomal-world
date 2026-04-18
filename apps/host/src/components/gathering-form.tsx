@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@nomal-world/db/client";
 import { updateGathering } from "@/app/actions/gathering";
@@ -18,6 +18,7 @@ interface GatheringFormProps {
 export function GatheringForm({ mode, gathering, categories }: GatheringFormProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false); // 동기적 중복 실행 방지 가드
   const [error, setError] = useState("");
   const editorContentRef = useRef<EditorJSContent | null>(gathering?.content || null);
 
@@ -31,6 +32,12 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
     capacity: gathering?.capacity?.toString() || "",
     cost: gathering?.cost?.toString() || "0",
     google_form_url: gathering?.google_form_url || "",
+    recruitment_start: gathering?.recruitment_start
+      ? new Date(gathering.recruitment_start).toISOString().slice(0, 16)
+      : "",
+    recruitment_end: gathering?.recruitment_end
+      ? new Date(gathering.recruitment_end).toISOString().slice(0, 16)
+      : "",
     thumbnail_url: gathering?.thumbnail_url || "",
   });
 
@@ -66,11 +73,14 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
   };
 
   const handleSave = async (status: "draft" | "published") => {
+    if (savingRef.current) return; // 중복 클릭 즉시 차단
+
     if (!form.title.trim()) {
       setError("모임 제목을 입력해주세요.");
       return;
     }
 
+    savingRef.current = true;
     setSaving(true);
     setError("");
 
@@ -88,6 +98,8 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
         capacity: form.capacity ? parseInt(form.capacity) : null,
         cost: parseInt(form.cost) || 0,
         google_form_url: form.google_form_url || null,
+        recruitment_start: form.recruitment_start ? new Date(form.recruitment_start).toISOString() : null,
+        recruitment_end: form.recruitment_end ? new Date(form.recruitment_end).toISOString() : null,
         thumbnail_url: form.thumbnail_url || null,
         content: editorContentRef.current,
         status,
@@ -108,7 +120,8 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
       }
     } catch {
       setError("저장 중 오류가 발생했습니다.");
-    } finally {
+      // 실패 시에만 리셋 — 성공 후 router.push() 도중 버튼이 재활성화되는 것을 방지
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -253,6 +266,29 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
               className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               placeholder="https://forms.gle/..."
             />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium mb-1">모집 기간</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="datetime-local"
+                name="recruitment_start"
+                value={form.recruitment_start}
+                onChange={handleChange}
+                className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              <span className="text-sm text-gray-500 shrink-0">~</span>
+              <input
+                type="datetime-local"
+                name="recruitment_end"
+                value={form.recruitment_end}
+                onChange={handleChange}
+                className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              설정하지 않으면 항상 신청 가능합니다.
+            </p>
           </div>
         </div>
       </section>
