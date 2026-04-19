@@ -43,6 +43,7 @@ export interface Gathering {
   summary: string | null;
   content: EditorJSContent | null;
   thumbnail_url: string | null;
+  thumbnail_detail_url: string | null;
   location: string | null;
   date: string | null;
   capacity: number | null;

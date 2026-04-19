@@ -27,11 +27,16 @@ function extractPathFromUrl(rawUrl: string): string | null {
   }
 }
 
-function extractStoragePaths(thumbnailUrl: string | null, content: unknown): string[] {
+function extractStoragePaths(thumbnailUrl: string | null, thumbnailDetailUrl: string | null, content: unknown): string[] {
   const paths: string[] = [];
 
   if (thumbnailUrl) {
     const p = extractPathFromUrl(thumbnailUrl);
+    if (p) paths.push(p);
+  }
+
+  if (thumbnailDetailUrl) {
+    const p = extractPathFromUrl(thumbnailDetailUrl);
     if (p) paths.push(p);
   }
 
@@ -70,6 +75,7 @@ export type GatheringUpdateData = {
   recruitment_start: string | null;
   recruitment_end: string | null;
   thumbnail_url: string | null;
+  thumbnail_detail_url: string | null;
   content: EditorJSContent | null;
   status: "draft" | "published";
 };
@@ -85,7 +91,7 @@ export async function updateGathering(
   // 저장 전 현재 DB 데이터 조회 (비교용)
   const { data: old, error: fetchError } = await supabase
     .from("gatherings")
-    .select("host_id, thumbnail_url, content")
+    .select("host_id, thumbnail_url, thumbnail_detail_url, content")
     .eq("id", gatheringId)
     .single();
 
@@ -98,6 +104,10 @@ export async function updateGathering(
   // 1) 대표 이미지가 교체된 경우: 기존 썸네일 삭제
   if (old.thumbnail_url && old.thumbnail_url !== data.thumbnail_url) {
     const p = extractPathFromUrl(old.thumbnail_url);
+    if (p) pathsToDelete.push(p);
+  }
+  if (old.thumbnail_detail_url && old.thumbnail_detail_url !== data.thumbnail_detail_url) {
+    const p = extractPathFromUrl(old.thumbnail_detail_url);
     if (p) pathsToDelete.push(p);
   }
 
@@ -131,6 +141,7 @@ export async function updateGathering(
       recruitment_start: data.recruitment_start,
       recruitment_end: data.recruitment_end,
       thumbnail_url: data.thumbnail_url,
+      thumbnail_detail_url: data.thumbnail_detail_url,
       content: data.content as unknown,
       status: data.status,
     })
@@ -179,7 +190,7 @@ export async function deleteGathering(gatheringId: string): Promise<void> {
   // 소유 확인
   const { data: gathering, error: fetchError } = await supabase
     .from("gatherings")
-    .select("host_id, thumbnail_url, content")
+    .select("host_id, thumbnail_url, thumbnail_detail_url, content")
     .eq("id", gatheringId)
     .single();
 
@@ -188,7 +199,7 @@ export async function deleteGathering(gatheringId: string): Promise<void> {
 
   // 이미지 경로 수집 후 Storage 삭제 (service role 사용)
   const adminClient = getAdminClient();
-  const paths = extractStoragePaths(gathering.thumbnail_url, gathering.content);
+  const paths = extractStoragePaths(gathering.thumbnail_url, gathering.thumbnail_detail_url, gathering.content);
   if (paths.length > 0) {
     await adminClient.storage.from(BUCKET).remove(paths);
   }
