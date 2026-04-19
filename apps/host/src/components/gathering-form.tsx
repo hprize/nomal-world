@@ -6,6 +6,7 @@ import { createClient } from "@nomal-world/db/client";
 import { updateGathering } from "@/app/actions/gathering";
 import type { Gathering, Category, EditorJSContent } from "@nomal-world/db/types";
 import dynamic from "next/dynamic";
+import { ThumbnailCropSection } from "./thumbnail-crop-section";
 
 const ContentEditor = dynamic(() => import("./content-editor"), { ssr: false });
 
@@ -39,6 +40,7 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
       ? new Date(gathering.recruitment_end).toISOString().slice(0, 16)
       : "",
     thumbnail_url: gathering?.thumbnail_url || "",
+    thumbnail_detail_url: gathering?.thumbnail_detail_url || "",
   });
 
   const handleChange = (
@@ -47,30 +49,6 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const supabase = createClient();
-      const ext = file.name.split(".").pop();
-      const fileName = `thumbnails/${Date.now()}.${ext}`;
-
-      const { error } = await supabase.storage
-        .from("gathering-images")
-        .upload(fileName, file);
-
-      if (error) throw error;
-
-      const { data: urlData } = supabase.storage
-        .from("gathering-images")
-        .getPublicUrl(fileName);
-
-      setForm((prev) => ({ ...prev, thumbnail_url: urlData.publicUrl }));
-    } catch {
-      setError("이미지 업로드에 실패했습니다.");
-    }
-  };
 
   const handleSave = async (status: "draft" | "published") => {
     if (savingRef.current) return; // 중복 클릭 즉시 차단
@@ -101,6 +79,7 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
         recruitment_start: form.recruitment_start ? new Date(form.recruitment_start).toISOString() : null,
         recruitment_end: form.recruitment_end ? new Date(form.recruitment_end).toISOString() : null,
         thumbnail_url: form.thumbnail_url || null,
+        thumbnail_detail_url: form.thumbnail_detail_url || null,
         content: editorContentRef.current,
         status,
       };
@@ -296,18 +275,14 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
       {/* 대표 이미지 */}
       <section className="bg-white rounded-xl p-6 space-y-4">
         <h2 className="font-semibold text-lg">대표 이미지</h2>
-        {form.thumbnail_url && (
-          <img
-            src={form.thumbnail_url}
-            alt="대표 이미지"
-            className="w-full max-h-64 object-cover rounded-lg"
-          />
-        )}
-        <input
-          type="file"
-          accept="image/*"
-          onChange={handleThumbnailUpload}
-          className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+        <p className="text-xs text-muted-foreground">
+          이미지를 선택한 뒤 카드용(4:3)과 상세용(16:9) 각각 크롭 영역을 지정하고 적용해주세요.
+        </p>
+        <ThumbnailCropSection
+          initialCardUrl={form.thumbnail_url}
+          initialDetailUrl={form.thumbnail_detail_url}
+          onCardChange={(url) => setForm((prev) => ({ ...prev, thumbnail_url: url }))}
+          onDetailChange={(url) => setForm((prev) => ({ ...prev, thumbnail_detail_url: url }))}
         />
       </section>
 

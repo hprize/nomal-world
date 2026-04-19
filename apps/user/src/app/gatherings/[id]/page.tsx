@@ -7,7 +7,7 @@ import { ViewTracker } from "@/components/view-tracker";
 import { ApplyButton } from "@/components/apply-button";
 import type { GatheringWithCategory } from "@nomal-world/db/types";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 async function getGathering(id: string): Promise<GatheringWithCategory | null> {
   try {

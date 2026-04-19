@@ -45,9 +45,9 @@ export function GatheringDetail({ gathering, editHref, actionsSlot, applySlot }:
 
       {/* ── Mobile / Tablet: 풀 너비 이미지 ── */}
       <div className="lg:hidden aspect-[16/9] w-full overflow-hidden bg-muted">
-        {gathering.thumbnail_url ? (
+        {(gathering.thumbnail_detail_url ?? gathering.thumbnail_url) ? (
           <img
-            src={gathering.thumbnail_url}
+            src={gathering.thumbnail_detail_url ?? gathering.thumbnail_url!}
             alt={gathering.title}
             className="w-full h-full object-cover"
           />
@@ -106,15 +106,15 @@ export function GatheringDetail({ gathering, editHref, actionsSlot, applySlot }:
       </div>
 
       {/* ── Desktop: 2열 레이아웃 ── */}
-      <div className="max-w-6xl mx-auto px-6">
+      <div className="max-w-6xl mx-auto lg:px-6">
         <div className="lg:grid lg:grid-cols-[1fr_360px] lg:gap-12 lg:items-start lg:pt-8">
 
           {/* 왼쪽: 이미지 + 소개글 */}
           <div>
             <div className="hidden lg:block aspect-[16/9] w-full overflow-hidden bg-muted rounded-sm mb-8">
-              {gathering.thumbnail_url ? (
+              {(gathering.thumbnail_detail_url ?? gathering.thumbnail_url) ? (
                 <img
-                  src={gathering.thumbnail_url}
+                  src={gathering.thumbnail_detail_url ?? gathering.thumbnail_url!}
                   alt={gathering.title}
                   className="w-full h-full object-cover"
                 />

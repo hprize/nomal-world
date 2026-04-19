@@ -5,7 +5,7 @@ import { CategoryFilter } from "@/components/category-filter";
 import { createServerClient } from "@nomal-world/db/server";
 import type { GatheringWithCategory } from "@nomal-world/db/types";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 async function getGatherings(category?: string): Promise<GatheringWithCategory[]> {
   try {
