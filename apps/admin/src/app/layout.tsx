@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/react";
 import { Logo } from "@nomal-world/ui/logo";
 import { SidebarNav } from "@/components/sidebar-nav";
 import "./globals.css";
@@ -28,6 +29,7 @@ export default function RootLayout({
           {/* Main content */}
           <main className="flex-1 bg-gray-50">{children}</main>
         </div>
+        <Analytics />
       </body>
     </html>
   );

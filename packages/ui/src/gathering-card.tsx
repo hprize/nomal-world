@@ -9,6 +9,7 @@ interface GatheringCardProps {
   href?: string;
   onClick?: () => void;
   showStatus?: boolean;
+  isPinned?: boolean;
 }
 
 export function GatheringCard({
@@ -16,6 +17,7 @@ export function GatheringCard({
   href,
   onClick,
   showStatus = false,
+  isPinned = false,
 }: GatheringCardProps) {
   const Wrapper = href ? "a" : "div";
   const dday = getDdayCount(gathering.recruitment_end ?? null);
@@ -40,6 +42,11 @@ export function GatheringCard({
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
             <span className="text-4xl">🎉</span>
+          </div>
+        )}
+        {isPinned && (
+          <div className="absolute top-3 left-3">
+            <Badge variant="default" className="bg-white/80 backdrop-blur-sm text-gray-700 border-white/50">📌</Badge>
           </div>
         )}
         {(showStatus || dday !== null) && (

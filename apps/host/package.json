@@ -20,6 +20,7 @@
     "@react-editor-js/client": "^2.1.0",
     "@supabase/ssr": "^0.5.0",
     "@supabase/supabase-js": "^2.49.0",
+    "@vercel/analytics": "^2.0.1",
     "editorjs-text-alignment-blocktune": "^1.0.3",
     "editorjs-undo": "^2.0.28",
     "lucide-react": "^0.474.0",

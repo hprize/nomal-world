@@ -96,3 +96,59 @@ export async function updateGatheringStatus(
   if (error) throw new Error(error.message);
   revalidatePath("/gatherings");
 }
+
+export async function togglePinGathering(
+  gatheringId: string,
+  pinned: boolean
+): Promise<void> {
+  await assertAdmin();
+
+  const supabase = getAdminClient();
+
+  if (pinned) {
+    // 현재 최대 pin_order를 구해서 +1
+    const { data: maxRow } = await supabase
+      .from("gatherings")
+      .select("pin_order")
+      .eq("is_pinned", true)
+      .order("pin_order", { ascending: false })
+      .limit(1)
+      .single();
+
+    const nextOrder = (maxRow?.pin_order ?? -1) + 1;
+
+    const { error } = await supabase
+      .from("gatherings")
+      .update({ is_pinned: true, pin_order: nextOrder })
+      .eq("id", gatheringId);
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await supabase
+      .from("gatherings")
+      .update({ is_pinned: false, pin_order: 0 })
+      .eq("id", gatheringId);
+    if (error) throw new Error(error.message);
+  }
+
+  revalidatePath("/gatherings");
+}
+
+export async function updatePinOrder(orderedIds: string[]): Promise<void> {
+  await assertAdmin();
+
+  const supabase = getAdminClient();
+
+  // 각 ID에 인덱스 순서대로 pin_order 부여
+  const updates = orderedIds.map((id, index) =>
+    supabase
+      .from("gatherings")
+      .update({ pin_order: index })
+      .eq("id", id)
+  );
+
+  const results = await Promise.all(updates);
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw new Error(failed.error.message);
+
+  revalidatePath("/gatherings");
+}

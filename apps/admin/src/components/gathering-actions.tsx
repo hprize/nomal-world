@@ -1,15 +1,25 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { deleteGathering, updateGatheringStatus } from "@/app/actions/gathering";
+import { deleteGathering, updateGatheringStatus, togglePinGathering } from "@/app/actions/gathering";
 
 interface GatheringActionsProps {
   gatheringId: string;
   currentStatus: string;
+  isPinned: boolean;
 }
 
-export function GatheringActions({ gatheringId, currentStatus }: GatheringActionsProps) {
+export function GatheringActions({ gatheringId, currentStatus, isPinned }: GatheringActionsProps) {
   const router = useRouter();
+
+  const handleTogglePin = async () => {
+    try {
+      await togglePinGathering(gatheringId, !isPinned);
+      router.refresh();
+    } catch {
+      alert("고정 상태 변경 중 오류가 발생했습니다.");
+    }
+  };
 
   const handleStatusChange = async (newStatus: "draft" | "published" | "closed") => {
     try {
@@ -32,6 +42,16 @@ export function GatheringActions({ gatheringId, currentStatus }: GatheringAction
 
   return (
     <div className="flex gap-2">
+      <button
+        onClick={handleTogglePin}
+        className={`text-xs px-2 py-1 rounded transition-colors ${
+          isPinned
+            ? "bg-blue-50 text-blue-700 hover:bg-blue-100"
+            : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+        }`}
+      >
+        {isPinned ? "고정 해제" : "고정"}
+      </button>
       {currentStatus !== "published" && (
         <button
           onClick={() => handleStatusChange("published")}

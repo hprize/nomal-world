@@ -27,6 +27,8 @@ async function getGatherings(category?: string): Promise<GatheringWithCategory[]
       .from("gatherings")
       .select("*, category:categories(*)")
       .eq("status", "published")
+      .order("is_pinned", { ascending: false })
+      .order("pin_order", { ascending: true })
       .order("created_at", { ascending: false });
 
     if (categoryId) {
@@ -76,6 +78,7 @@ export default async function HomePage({
                 key={gathering.id}
                 gathering={gathering}
                 href={`/gatherings/${gathering.id}`}
+                isPinned={gathering.is_pinned}
               />
             ))}
           </div>

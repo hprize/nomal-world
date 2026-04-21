@@ -7,6 +7,7 @@ import { LogoutButton } from "./logout-button";
 const navItems = [
   { href: "/", label: "대시보드" },
   { href: "/gatherings", label: "모임 관리" },
+  { href: "/gatherings/pinned", label: "고정 관리" },
   { href: "/users", label: "사용자 관리" },
   { href: "/stats", label: "통계" },
 ];
@@ -19,7 +20,11 @@ export function SidebarNav() {
       <nav className="space-y-1">
         {navItems.map(({ href, label }) => {
           const isActive =
-            href === "/" ? pathname === "/" : pathname.startsWith(href);
+            href === "/"
+              ? pathname === "/"
+              : href === "/gatherings"
+                ? pathname === "/gatherings"
+                : pathname.startsWith(href);
 
           return (
             <Link

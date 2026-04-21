@@ -7,6 +7,7 @@ interface GatheringRow {
   id: string;
   title: string;
   status: string;
+  is_pinned: boolean;
   date: string | null;
   created_at: string;
   host: { name: string | null; email: string } | null;
@@ -24,7 +25,7 @@ export default async function GatheringsManagePage({
     const supabase = createServerClient();
     let query = supabase
       .from("gatherings")
-      .select("id, title, status, date, created_at, host:profiles(name, email), category:categories(name)")
+      .select("id, title, status, is_pinned, date, created_at, host:profiles(name, email), category:categories(name)")
       .order("created_at", { ascending: false });
 
     if (searchParams.status && searchParams.status !== "all") {
@@ -81,6 +82,7 @@ export default async function GatheringsManagePage({
         <table className="w-full">
           <thead className="bg-gray-50 border-b">
             <tr>
+              <th className="text-left px-6 py-3 text-sm font-medium text-muted-foreground">고정</th>
               <th className="text-left px-6 py-3 text-sm font-medium text-muted-foreground">제목</th>
               <th className="text-left px-6 py-3 text-sm font-medium text-muted-foreground">호스트</th>
               <th className="text-left px-6 py-3 text-sm font-medium text-muted-foreground">카테고리</th>
@@ -95,6 +97,9 @@ export default async function GatheringsManagePage({
                 const status = statusLabel[g.status] || statusLabel.draft;
                 return (
                   <tr key={g.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-center">
+                      {g.is_pinned && <span title="고정됨">📌</span>}
+                    </td>
                     <td className="px-6 py-4 font-medium">{g.title}</td>
                     <td className="px-6 py-4 text-sm text-muted-foreground">
                       {g.host?.name || g.host?.email || "-"}
@@ -109,14 +114,14 @@ export default async function GatheringsManagePage({
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <GatheringActions gatheringId={g.id} currentStatus={g.status} />
+                      <GatheringActions gatheringId={g.id} currentStatus={g.status} isPinned={g.is_pinned} />
                     </td>
                   </tr>
                 );
               })
             ) : (
               <tr>
-                <td colSpan={6} className="text-center py-12 text-muted-foreground">
+                <td colSpan={7} className="text-center py-12 text-muted-foreground">
                   등록된 모임이 없습니다.
                 </td>
               </tr>
