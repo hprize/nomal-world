@@ -52,6 +52,8 @@ export interface Gathering {
   recruitment_start: string | null;
   recruitment_end: string | null;
   status: "draft" | "published" | "closed";
+  is_pinned: boolean;
+  pin_order: number;
   created_at: string;
   updated_at: string;
 }
