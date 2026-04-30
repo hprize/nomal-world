@@ -1,43 +1,24 @@
+import { Suspense } from "react";
 import Link from "next/link";
-import { GatheringCard } from "@nomal-world/ui/gathering-card";
 import { Logo } from "@nomal-world/ui/logo";
 import { CategoryFilter } from "@/components/category-filter";
+import { GatheringGrid } from "@/components/gathering-grid";
+import { GatheringGridSkeleton } from "@/components/gathering-grid-skeleton";
+import { Footer } from "@/components/footer";
 import { createServerClient } from "@nomal-world/db/server";
-import type { GatheringWithCategory } from "@nomal-world/db/types";
+import type { HeaderButton } from "@nomal-world/db/types";
 
 export const revalidate = 60;
 
-async function getGatherings(category?: string): Promise<GatheringWithCategory[]> {
+async function getHeaderButtons(): Promise<HeaderButton[]> {
   try {
     const supabase = createServerClient();
-
-    // 카테고리 슬러그 → ID 변환 후 필터
-    let categoryId: string | undefined;
-    if (category && category !== "all") {
-      const { data: cat } = await supabase
-        .from("categories")
-        .select("id")
-        .eq("slug", category)
-        .single();
-      if (!cat) return [];
-      categoryId = cat.id;
-    }
-
-    let query = supabase
-      .from("gatherings")
-      .select("*, category:categories(*)")
-      .eq("status", "published")
-      .order("is_pinned", { ascending: false })
-      .order("pin_order", { ascending: true })
-      .order("created_at", { ascending: false });
-
-    if (categoryId) {
-      query = query.eq("category_id", categoryId);
-    }
-
-    const { data, error } = await query;
-    if (error) return [];
-    return (data as unknown as GatheringWithCategory[]) || [];
+    const { data } = await supabase
+      .from("header_buttons")
+      .select("*")
+      .eq("is_active", true)
+      .order("display_order", { ascending: true });
+    return (data as HeaderButton[]) || [];
   } catch {
     return [];
   }
@@ -48,19 +29,39 @@ export default async function HomePage({
 }: {
   searchParams: { category?: string };
 }) {
-  const gatherings = await getGatherings(searchParams.category);
+  const headerButtons = await getHeaderButtons();
 
   return (
     <main className="min-h-screen">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b">
         <div className="max-w-6xl mx-auto px-4 py-4">
-          <Link href="/">
-            <Logo />
-          </Link>
-          <p className="text-sm text-muted-foreground mt-1">
-            말도 안되는 세상
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <Link href="/">
+                <Logo />
+              </Link>
+              <p className="text-sm text-muted-foreground mt-1">
+                말도 안 되는 우리만의 세상
+              </p>
+            </div>
+            {headerButtons.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                {headerButtons.map((btn) => (
+                  <a
+                    key={btn.id}
+                    href={btn.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm px-4 py-2 rounded-lg font-bold text-white transition-opacity hover:opacity-80"
+                    style={{ backgroundColor: btn.color }}
+                  >
+                    {btn.label}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -70,30 +71,14 @@ export default async function HomePage({
       </section>
 
       {/* Gathering Grid */}
-      <section className="max-w-6xl mx-auto px-4 pb-12">
-        {gatherings.length > 0 ? (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-6 lg:gap-6">
-            {gatherings.map((gathering) => (
-              <GatheringCard
-                key={gathering.id}
-                gathering={gathering}
-                href={`/gatherings/${gathering.id}`}
-                isPinned={gathering.is_pinned}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-20">
-            <p className="text-5xl mb-4">🎉</p>
-            <p className="text-lg font-medium text-muted-foreground">
-              등록된 모임이 아직 없습니다
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">
-              곧 새로운 모임이 등록될 예정입니다!
-            </p>
-          </div>
-        )}
+      <section className="max-w-6xl mx-auto px-4 pb-20">
+        <Suspense key={searchParams.category ?? "all"} fallback={<GatheringGridSkeleton />}>
+          <GatheringGrid category={searchParams.category} />
+        </Suspense>
       </section>
+
+      {/* Footer */}
+      <Footer />
     </main>
   );
 }

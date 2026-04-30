@@ -10,6 +10,7 @@ const navItems = [
   { href: "/gatherings/pinned", label: "고정 관리" },
   { href: "/users", label: "사용자 관리" },
   { href: "/stats", label: "통계" },
+  { href: "/header-buttons", label: "헤더 버튼" },
 ];
 
 export function SidebarNav() {

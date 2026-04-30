@@ -1,4 +1,5 @@
 import * as React from "react";
+import Image from "next/image";
 import { cn, formatCost, formatDate, getDdayCount } from "./lib/utils";
 import { Badge } from "./components/badge";
 import type { GatheringWithCategory } from "@nomal-world/db/types";
@@ -34,10 +35,12 @@ export function GatheringCard({
       {/* Thumbnail */}
       <div className="relative aspect-[4/3] bg-muted overflow-hidden rounded-xl">
         {gathering.thumbnail_url ? (
-          <img
+          <Image
             src={gathering.thumbnail_url}
             alt={gathering.title}
-            className="w-full h-full object-cover"
+            fill
+            sizes="(max-width: 1024px) 50vw, 33vw"
+            className="object-cover"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">

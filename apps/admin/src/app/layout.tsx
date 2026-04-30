@@ -5,8 +5,13 @@ import { SidebarNav } from "@/components/sidebar-nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Nomal World 관리자",
-  description: "Nomal World 관리자 대시보드",
+  title: "노말월드 관리자",
+  description: "노말월드 관리자 대시보드",
+  openGraph: {
+    title: "노말월드 관리자",
+    description: "노말월드 관리자 대시보드",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

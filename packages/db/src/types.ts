@@ -16,6 +16,11 @@ export interface Database {
         Insert: Omit<Gathering, "id" | "created_at" | "updated_at">;
         Update: Partial<Omit<Gathering, "id" | "created_at" | "updated_at">>;
       };
+      header_buttons: {
+        Row: HeaderButton;
+        Insert: Omit<HeaderButton, "id" | "created_at">;
+        Update: Partial<Omit<HeaderButton, "id" | "created_at">>;
+      };
     };
   };
 }
@@ -75,6 +80,16 @@ export interface EditorJSBlock {
 /** Gathering with joined category */
 export interface GatheringWithCategory extends Gathering {
   category: Category | null;
+}
+
+export interface HeaderButton {
+  id: string;
+  label: string;
+  url: string;
+  color: string;
+  display_order: number;
+  is_active: boolean;
+  created_at: string;
 }
 
 export type GatheringEventType = "view" | "apply_click";
