@@ -3,8 +3,13 @@ import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Nomal World 호스트 - 모임 관리",
-  description: "Nomal World 모임을 만들고 관리하세요",
+  title: "노말월드 호스트 - 모임 관리",
+  description: "노말월드 모임을 만들고 관리하세요",
+  openGraph: {
+    title: "노말월드 호스트 - 모임 관리",
+    description: "노말월드 모임을 만들고 관리하세요",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

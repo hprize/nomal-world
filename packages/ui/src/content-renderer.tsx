@@ -1,4 +1,5 @@
 import * as React from "react";
+import Image from "next/image";
 import type { EditorJSContent } from "@nomal-world/db/types";
 
 interface ContentRendererProps {
@@ -69,10 +70,13 @@ export function ContentRenderer({ content }: ContentRendererProps) {
                 style={hasSizeConstraint ? { maxWidth: width, margin: "0 auto" } : undefined}
               >
                 {url && (
-                  <img
+                  <Image
                     src={url}
                     alt={caption || ""}
-                    className="w-full"
+                    width={800}
+                    height={600}
+                    sizes="(max-width: 768px) 100vw, 700px"
+                    className="w-full h-auto"
                   />
                 )}
                 {caption && (

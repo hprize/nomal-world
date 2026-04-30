@@ -1,4 +1,5 @@
 import * as React from "react";
+import Image from "next/image";
 import { Badge } from "./components/badge";
 import { ContentRenderer } from "./content-renderer";
 import { formatCost, formatDate, formatRecruitmentPeriod } from "./lib/utils";
@@ -44,12 +45,15 @@ export function GatheringDetail({ gathering, editHref, actionsSlot, applySlot }:
     <div className="pb-8">
 
       {/* ── Mobile / Tablet: 풀 너비 이미지 ── */}
-      <div className="lg:hidden aspect-[16/9] w-full overflow-hidden bg-muted">
+      <div className="lg:hidden relative aspect-[16/9] w-full overflow-hidden bg-muted">
         {(gathering.thumbnail_detail_url ?? gathering.thumbnail_url) ? (
-          <img
+          <Image
             src={gathering.thumbnail_detail_url ?? gathering.thumbnail_url!}
             alt={gathering.title}
-            className="w-full h-full object-cover"
+            fill
+            sizes="100vw"
+            className="object-cover"
+            priority
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
@@ -111,12 +115,15 @@ export function GatheringDetail({ gathering, editHref, actionsSlot, applySlot }:
 
           {/* 왼쪽: 이미지 + 소개글 */}
           <div>
-            <div className="hidden lg:block aspect-[16/9] w-full overflow-hidden bg-muted rounded-sm mb-8">
+            <div className="hidden lg:block relative aspect-[16/9] w-full overflow-hidden bg-muted rounded-sm mb-8">
               {(gathering.thumbnail_detail_url ?? gathering.thumbnail_url) ? (
-                <img
+                <Image
                   src={gathering.thumbnail_detail_url ?? gathering.thumbnail_url!}
                   alt={gathering.title}
-                  className="w-full h-full object-cover"
+                  fill
+                  sizes="60vw"
+                  className="object-cover"
+                  priority
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
