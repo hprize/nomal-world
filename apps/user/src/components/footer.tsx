@@ -8,7 +8,7 @@ const RELATED_LINKS_URL = "https://linktr.ee/teenkbell?utm_source=linktree_profi
 
 const INFO_LINKS = [
   { label: "노말십대 인스타그램", href: "https://www.instagram.com/nomal10dae?igsh=c2Rxc2dpNmJudnlt&utm_source=qr" },
-  { label: "이용규칙", href: "#" },
+  { label: "이용규칙", href: "https://electric-walk-6dc.notion.site/35331ce6f75380dc9174e10dadf975c9" },
   { label: "운영진 소개", href: "https://www.roundzone.info/" },
   { label: "의견건의함", href: "https://forms.gle/voZGn2HACqvLd7ce6" },
 ];
