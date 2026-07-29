@@ -142,7 +142,7 @@ Supabase에 올리지 않고, **폼을 실제로 저장할 때** 한꺼번에 �
 Supabase Storage 버킷 `gathering-images`가 썸네일과 본문 이미지를 보관합니다(public 버킷).
 운영 환경에서는 대시보드에서 버킷과 스토리지 RLS 정책(authenticated INSERT/UPDATE/DELETE, public 읽기)을
 관리합니다. 로컬은 `config.toml`의 `[storage.buckets.gathering-images]`로 버킷이 자동 생성되고,
-스토리지 RLS 정책은 `supabase/seed.sql`이 재현합니다(아래 "로컬 Supabase" 참고).
+스토리지 RLS 정책은 마이그레이션 `006`이 관리합니다(아래 "로컬 Supabase" 참고).
 이미지는 `*.supabase.co`(로컬은 `127.0.0.1:54331`)의 public URL로 서빙됩니다.
 
 ### 통계
@@ -179,10 +179,13 @@ supabase db reset     # 마이그레이션 + seed.sql 재적용(로컬 DB 초기
 **포트 대역** — 다른 로컬 Supabase 프로젝트(예: Hanteo)와 충돌하지 않도록 기본 5432x 대신 5433x를 씁니다.
 
 **로컬 전용 `seed.sql`** — `supabase/seed.sql`은 `db reset` 시 실행되며(운영에 push 안 됨),
-운영 대시보드에만 존재해 마이그레이션에 없는 항목을 로컬에 재현합니다:
-스토리지 RLS 정책(authenticated 업로드/수정/삭제), 회원가입 시 profiles 자동 생성 트리거,
-누락 컬럼(`thumbnail_detail_url`, `recruitment_*`)과 `header_buttons` 테이블.
-덕분에 아래 db pull 없이도 로컬에서 이미지 업로드/모임 생성 흐름을 테스트할 수 있습니다.
+**스키마가 아니라 로컬에만 필요한 두 가지**만 담습니다:
+- **Data API 롤 GRANT** — 운영은 레거시 자동 노출로 이미 부여돼 있으나, 최신 CLI로 만든
+  로컬 DB는 부여되지 않아 API 요청이 `42501`로 거부됨
+- **회원가입 시 profiles 자동 생성 트리거** — 운영에는 없음(앱에 자체 가입 기능이 없어
+  계정을 수동 생성). 로컬에서 테스트 계정을 만들기 위한 편의 장치
+
+스키마 자체(컬럼·테이블·정책·함수)는 **마이그레이션 001~006이 운영과 동일하게 재현**합니다.
 
 **앱을 로컬 Supabase에 연결** — 별도 작업 없이 `pnpm --filter @nomal-world/host dev`를 실행하면
 `next dev`가 `apps/host/.env.development.local`(로컬 값)을 자동으로 읽습니다. 운영 값은
@@ -190,25 +193,28 @@ supabase db reset     # 마이그레이션 + seed.sql 재적용(로컬 DB 초기
 `.env.development.local`의 로컬 값은 `cd packages/db && supabase status`로 확인·갱신하세요
 (로컬 anon/service_role 키는 모든 로컬 Supabase에서 동일한 데모 키).
 
-### 마이그레이션 & 스키마 드리프트 주의 ⚠️
+### 마이그레이션 & 스키마 드리프트
 
-`packages/db/supabase/migrations/`의 마이그레이션(001~005)은 **운영 DB 스키마보다 뒤처져 있습니다.**
-다음 항목은 마이그레이션에 없고 운영 대시보드에서만 적용되어 있습니다:
+운영 DB는 오랫동안 대시보드에서 직접 수정돼 마이그레이션(001~005)보다 앞서 있었습니다.
+**`006_sync_with_production.sql`이 그 차이를 코드로 옮겨 해소**했습니다:
 - `gatherings.thumbnail_detail_url`, `recruitment_start`, `recruitment_end` 컬럼
-- `header_buttons` 테이블
-- 스토리지 버킷/정책, 프로필 자동 생성 트리거
+- `header_buttons` 테이블 + 정책
+- `is_admin()` 함수, 어드민 정책들을 이 함수 기반으로 교체
+- `gatherings_delete_own` 정책
+- `gathering-images` 스토리지 정책
 
-따라서 마이그레이션만으로 만든 로컬 DB는 운영과 다릅니다. 위 `seed.sql`이 이 차이를 로컬에서
-임시로 메워 당장의 테스트는 가능하지만, **정식 해소는 운영 DB에서 스키마를 pull** 하는 것입니다
-(pull 후에는 마이그레이션이 소스가 되고 seed의 3)번 블록은 무해한 no-op이 됨):
-```bash
-cd packages/db
-supabase login                              # 운영 프로젝트에 접근 가능한 계정으로
-supabase link --project-ref <운영 project-ref>
-supabase db pull                            # 운영 스키마 → 새 마이그레이션 생성
-supabase db reset                           # 로컬에 반영
-```
-> 스키마를 변경할 때는 대시보드 직접 수정 대신 마이그레이션 파일로 관리해 드리프트를 줄이는 것이 좋습니다.
+**001의 알려진 함정** — `profiles_read_admin`이 자기 테이블(`profiles`)을 다시 조회해
+`42P17 infinite recursion` 을 유발합니다. 006이 `is_admin()`(SECURITY DEFINER)로 교체해
+재귀 고리를 끊습니다. 001을 직접 고치지 않는 이유는 이미 적용된 마이그레이션이기 때문입니다.
+
+**스토리지 SELECT 정책이 필수인 이유** — `storage`의 `remove()`는 삭제 전에 대상 객체를
+SELECT로 조회합니다. SELECT 정책이 없으면 조회가 0건이 되어 아무것도 지우지 못한 채
+`200 + []`를 반환하고(조용한 무동작), 업로드 실패 시 롤백이 무력화됩니다.
+
+> 운영에 마이그레이션 이력 테이블(`supabase_migrations.schema_migrations`)이 없어
+> `db push`/`db pull`을 바로 쓸 수 없습니다. 사용하려면 먼저
+> `supabase migration repair --status applied 001 … 006` 으로 이력을 맞춰야 합니다.
+> 앞으로 스키마를 바꿀 때는 대시보드 직접 수정 대신 마이그레이션 파일로 관리하세요.
 
 ## 커밋 규칙
 
