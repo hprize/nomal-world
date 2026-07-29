@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       .from("gathering-images")
       .getPublicUrl(fileName);
 
-    return NextResponse.json({ success: 1, file: { url: urlData.publicUrl } });
+    return NextResponse.json({ success: 1, file: { url: urlData.publicUrl }, filePath: fileName });
   } catch {
     return NextResponse.json({ success: 0, error: "Upload failed" }, { status: 500 });
   }
