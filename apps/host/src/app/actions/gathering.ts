@@ -123,10 +123,6 @@ export async function updateGathering(
 
   const adminClient = getAdminClient();
 
-  if (pathsToDelete.length > 0) {
-    await adminClient.storage.from(BUCKET).remove(pathsToDelete);
-  }
-
   const { error } = await adminClient
     .from("gatherings")
     .update({
@@ -148,6 +144,19 @@ export async function updateGathering(
     .eq("id", gatheringId);
 
   if (error) throw new Error(error.message);
+
+  // DB 저장 성공 후에만 교체·제거된 옛 이미지 삭제
+  // (업데이트가 실패하면 기존 이미지를 그대로 보존 → 깨진 참조 방지)
+  // DB는 이미 커밋됨 = 저장 성공. 여기서의 삭제 실패는 고아 파일만 남길 뿐이므로
+  // 절대 throw로 전파하지 않음 — 전파되면 호출부(handleSave)가 방금 저장된 새 이미지를
+  // 롤백 삭제해 커밋된 행이 깨진 이미지를 참조하게 됨.
+  if (pathsToDelete.length > 0) {
+    try {
+      await adminClient.storage.from(BUCKET).remove(pathsToDelete);
+    } catch {
+      // 고아 파일 정리 실패는 무시 (저장 자체는 성공)
+    }
+  }
 }
 
 export async function toggleGatheringStatus(

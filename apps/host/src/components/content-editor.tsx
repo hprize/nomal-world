@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
 import EditorJS from "@editorjs/editorjs";
 import Header from "@editorjs/header";
 import Paragraph from "@editorjs/paragraph";
@@ -14,367 +14,449 @@ import { ImageSizeTune } from "./image-size-tune";
 import { createClient } from "@nomal-world/db/client";
 import type { EditorJSContent } from "@nomal-world/db/types";
 
+export interface ContentEditorHandle {
+  // 이미지를 업로드하고 실제 URL로 교체된 content와 업로드된 파일 경로를 반환.
+  // pending 상태(blob URL·File)는 여기서 정리하지 않음 → 저장 전체가 성공하면 commit()에서 정리.
+  flushPendingUploads: (content: EditorJSContent) => Promise<{ content: EditorJSContent; uploadedPaths: string[] }>;
+  // 저장 전체 성공 확정 시 호출 — blob URL 해제 및 pending 정리
+  commit: () => void;
+}
+
 interface ContentEditorProps {
   initialData?: EditorJSContent;
   onChange?: (data: EditorJSContent) => void;
 }
 
-export default function ContentEditor({ initialData, onChange }: ContentEditorProps) {
-  const editorRef = useRef<EditorJS | null>(null);
-  const holderRef = useRef<HTMLDivElement>(null);
+const ContentEditor = forwardRef<ContentEditorHandle, ContentEditorProps>(
+  ({ initialData, onChange }, ref) => {
+    const editorRef = useRef<EditorJS | null>(null);
+    const holderRef = useRef<HTMLDivElement>(null);
+    const pendingFilesRef = useRef<Map<string, File>>(new Map()); // blob URL → File
+    const pendingUrlsRef = useRef<Set<string>>(new Set());        // 외부 http(s) URL
 
-  const uploadImage = useCallback(async (file: File) => {
-    const supabase = createClient();
-    const ext = file.name.split(".").pop();
-    const fileName = `content/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const uploadImage = useCallback(async (file: File) => {
+      const blobUrl = URL.createObjectURL(file);
+      pendingFilesRef.current.set(blobUrl, file);
+      return { success: 1, file: { url: blobUrl } };
+    }, []);
 
-    const { error } = await supabase.storage
-      .from("gathering-images")
-      .upload(fileName, file);
+    const uploadImageByUrl = useCallback(async (rawUrl: string) => {
 
-    if (error) throw error;
+      // 1) 공백/개행 제거
+      const trimmed = rawUrl.trim();
 
-    const { data: urlData } = supabase.storage
-      .from("gathering-images")
-      .getPublicUrl(fileName);
+      // 2) 프로토콜 생략 URL (//) → https: 보완
+      const url = trimmed.startsWith("//") ? `https:${trimmed}` : trimmed;
 
-    return {
-      success: 1,
-      file: { url: urlData.publicUrl },
-    };
-  }, []);
-
-  const uploadImageByUrl = useCallback(async (rawUrl: string) => {
-
-    // 1) 공백/개행 제거
-    const trimmed = rawUrl.trim();
-
-    // 2) 프로토콜 생략 URL (//) → https: 보완
-    const url = trimmed.startsWith("//") ? `https:${trimmed}` : trimmed;
-
-    // 3) data: / blob: → 브라우저에서 직접 처리
-    if (url.startsWith("data:") || url.startsWith("blob:")) {
-      try {
-        const res = await fetch(url);
-        const blob = await res.blob();
-        const ext = blob.type.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
-        const file = new File([blob], `paste-${Date.now()}.${ext}`, { type: blob.type });
-        return uploadImage(file);
-      } catch {
-        return { success: 0, error: "Could not fetch local image" };
-      }
-    }
-
-    // 4) http/https URL → 서버 프록시
-    if (url.startsWith("http:") || url.startsWith("https:")) {
-      const res = await fetch("/api/upload-image-by-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-      return res.json();
-    }
-
-    // 5) 알 수 없는 scheme → 조용히 실패
-    return { success: 0, error: "Unsupported URL scheme" };
-  }, [uploadImage]);
-
-  // 붙여넣기 통합 핸들러 (캡처 단계로 Editor.js보다 먼저 실행)
-  // 모든 HTML 붙여넣기의 \n을 정규화해 contenteditable 커서 오동작 방지
-  // HTML이 없는 순수 텍스트 붙여넣기는 Editor.js 기본 동작에 위임
-  const handlePaste = useCallback(async (event: Event) => {
-    const clipEvent = event as ClipboardEvent;
-    const html = clipEvent.clipboardData?.getData("text/html") || "";
-
-    // HTML이 없으면 Editor.js 기본 핸들러에 위임 (순수 텍스트)
-    if (!html.trim()) return;
-
-    // Notion 출처 판별 → 이미지 바이너리 수집
-    const isNotion = html.includes("notionvc:") || html.includes("attachment:");
-    const imageFiles: File[] = [];
-    if (isNotion) {
-      for (const item of Array.from(clipEvent.clipboardData?.items ?? [])) {
-        if (item.kind === "file" && item.type.startsWith("image/")) {
-          const file = item.getAsFile();
-          if (file) imageFiles.push(file);
+      // 3) data: / blob: → 브라우저에서 직접 처리 → uploadImage로 deferred 처리
+      if (url.startsWith("data:") || url.startsWith("blob:")) {
+        try {
+          const res = await fetch(url);
+          const blob = await res.blob();
+          const ext = blob.type.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
+          const file = new File([blob], `paste-${Date.now()}.${ext}`, { type: blob.type });
+          return uploadImage(file);
+        } catch {
+          return { success: 0, error: "Could not fetch local image" };
         }
       }
-      // attachment: URL만 있고 바이너리도 없으며 notionvc도 없는 경우 → Editor.js에 위임
-      if (html.includes("attachment:") && imageFiles.length === 0 && !html.includes("notionvc:")) return;
-    }
 
-    event.preventDefault();
-    event.stopPropagation();
-
-    const editor = editorRef.current;
-    if (!editor) return;
-
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    let imgIndex = 0;
-
-    for (const node of Array.from(doc.body.childNodes)) {
-      // HTML 주석(notionvc 등) 스킵
-      if (node.nodeType === Node.COMMENT_NODE) continue;
-
-      if (node.nodeType === Node.TEXT_NODE) {
-        const text = (node.textContent ?? "").trim();
-        if (text) editor.blocks.insert("paragraph", { text });
-        continue;
-      }
-      if (!(node instanceof Element)) continue;
-
-      const tag = node.tagName.toLowerCase();
-
-      // <hr> → delimiter 블록
-      if (tag === "hr") {
-        editor.blocks.insert("delimiter", {});
-        continue;
+      // 4) http/https URL → pendingUrlsRef에 기록하고 외부 URL 그대로 반환 (deferred)
+      if (url.startsWith("http:") || url.startsWith("https:")) {
+        pendingUrlsRef.current.add(url);
+        return { success: 1, file: { url } };
       }
 
-      // <img> → image 블록 (http/https URL만)
-      if (tag === "img") {
-        const src = node.getAttribute("src");
-        if (src && (src.startsWith("http:") || src.startsWith("https:"))) {
-          const result = await uploadImageByUrl(src);
-          if (result.success === 1) {
-            editor.blocks.insert("image", {
-              file: { url: result.file.url },
-              caption: node.getAttribute("alt") || "",
-              withBorder: false,
-              withBackground: false,
-              stretched: false,
-            });
-          }
-        }
-        continue;
-      }
+      // 5) 알 수 없는 scheme → 조용히 실패
+      return { success: 0, error: "Unsupported URL scheme" };
+    }, [uploadImage]);
 
-      if (tag === "p") {
-        // Notion attachment: 이미지가 <p> 안에 있는 경우
-        const imgEl = node.tagName === "IMG"
-          ? node
-          : node.querySelector("img[src^='attachment:']");
+    useImperativeHandle(ref, () => ({
+      flushPendingUploads: async (content: EditorJSContent) => {
+        const supabase = createClient();
+        const uploadedPaths: string[] = []; // 이번 flush에서 업로드한 파일 경로
 
-        if (imgEl && imageFiles[imgIndex]) {
-          const file = imageFiles[imgIndex++];
-          const result = await uploadImage(file);
-          if (result.success === 1) {
-            editor.blocks.insert("image", {
-              file: { url: result.file.url },
-              caption: imgEl.getAttribute("alt") || "",
-              withBorder: false,
-              withBackground: false,
-              stretched: false,
-            });
-          }
-          imgEl.remove();
-          const remaining = node.innerHTML.trim();
-          if (remaining) editor.blocks.insert("paragraph", { text: remaining.replace(/\n/g, "<br>") });
-        } else {
-          // 비-Notion <img> 처리: <p> 안의 http(s) 이미지를 별도 블록으로 추출
-          const embeddedImg = node.querySelector("img");
-          if (embeddedImg) {
-            const src = embeddedImg.getAttribute("src");
-            if (src && (src.startsWith("http:") || src.startsWith("https:"))) {
-              const result = await uploadImageByUrl(src);
-              if (result.success === 1) {
-                editor.blocks.insert("image", {
-                  file: { url: result.file.url },
-                  caption: embeddedImg.getAttribute("alt") || "",
-                  withBorder: false,
-                  withBackground: false,
-                  stretched: false,
-                });
-              }
+        try {
+          const blocks: typeof content.blocks = [];
+
+          for (const block of content.blocks) {
+            if (block.type !== "image") {
+              blocks.push(block);
+              continue;
             }
-            embeddedImg.remove();
+
+            const url: string = (block.data as { file?: { url?: string } })?.file?.url ?? "";
+
+            // Case 1: blob URL → pendingFilesRef에서 File 꺼내 Supabase 직접 업로드
+            if (url.startsWith("blob:")) {
+              const file = pendingFilesRef.current.get(url);
+              if (!file) { blocks.push(block); continue; }
+
+              const ext = file.name.split(".").pop();
+              const fileName = `content/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+              const { error } = await supabase.storage
+                .from("gathering-images")
+                .upload(fileName, file);
+              if (error) throw error;
+
+              uploadedPaths.push(fileName);
+              const { data: urlData } = supabase.storage
+                .from("gathering-images")
+                .getPublicUrl(fileName);
+
+              // blob URL 해제·pending 제거는 commit()에서 — 저장 실패 시 재시도를 위해 여기서 정리하지 않음
+              blocks.push({ ...block, data: { ...block.data, file: { url: urlData.publicUrl } } });
+
+            // Case 2: 외부 URL → 서버 API로 Supabase 업로드
+            } else if (pendingUrlsRef.current.has(url)) {
+              const res = await fetch("/api/upload-image-by-url", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url }),
+              });
+              const result = await res.json();
+              if (!result.success) throw new Error(result.error ?? "Upload failed");
+
+              uploadedPaths.push(result.filePath);
+              // pendingUrlsRef 제거도 commit()에서 처리 (재시도 대비)
+              blocks.push({ ...block, data: { ...block.data, file: { url: result.file.url } } });
+
+            // Case 3: 이미 Supabase URL (편집 모드의 기존 이미지) → 그대로
+            } else {
+              blocks.push(block);
+            }
           }
-          // \n → <br> 치환해 contenteditable 커서 오동작 방지
-          const content = node.innerHTML.replace(/\n/g, "<br>");
-          if (content.trim()) editor.blocks.insert("paragraph", { text: content });
+
+          return { content: { ...content, blocks }, uploadedPaths };
+
+        } catch (err) {
+          // flush 자체가 중간에 실패한 경우: 이번 flush에서 올린 파일만 롤백
+          // (bubble up 후 handleSave가 이미 반환된 다른 flush의 파일을 정리)
+          if (uploadedPaths.length > 0) {
+            await supabase.storage.from("gathering-images").remove(uploadedPaths);
+          }
+          // blob URL, pendingFilesRef, pendingUrlsRef는 그대로 유지 → 에디터 상태 보존, 재시도 가능
+          throw err;
         }
-      } else if (tag === "ul" || tag === "ol") {
-        // @editorjs/list v1.10: items는 string[] (플러그인 API에 맞는 형식)
-        // :scope > li 로 직접 자식만 선택해 중첩 li 중복 방지
-        const items = Array.from(node.querySelectorAll(":scope > li"))
-          .map((li) => li.innerHTML.replace(/\n/g, "<br>"));
-        if (items.length > 0) {
-          editor.blocks.insert("list", {
-            style: tag === "ol" ? "ordered" : "unordered",
-            items,
-          });
+      },
+      commit: () => {
+        // 저장 전체 성공 확정 → 보관 중이던 blob URL 해제 및 pending 정리
+        for (const url of pendingFilesRef.current.keys()) {
+          URL.revokeObjectURL(url);
         }
-      } else if (/^h[1-6]$/.test(tag)) {
-        // 에디터 설정이 level 2~3만 허용하므로 클램프
-        const level = Math.min(Math.max(parseInt(tag[1]), 2), 3);
-        editor.blocks.insert("header", { text: node.innerHTML.replace(/\n/g, "<br>"), level });
-      } else {
-        // 그 외 태그 → 텍스트가 있으면 paragraph로 fallback
-        const text = node.innerHTML.replace(/\n/g, "<br>").trim();
-        if (text) editor.blocks.insert("paragraph", { text });
+        pendingFilesRef.current.clear();
+        pendingUrlsRef.current.clear();
+      },
+    }));
+
+    // 붙여넣기 통합 핸들러 (캡처 단계로 Editor.js보다 먼저 실행)
+    // 모든 HTML 붙여넣기의 \n을 정규화해 contenteditable 커서 오동작 방지
+    // HTML이 없는 순수 텍스트 붙여넣기는 Editor.js 기본 동작에 위임
+    const handlePaste = useCallback(async (event: Event) => {
+      const clipEvent = event as ClipboardEvent;
+      const html = clipEvent.clipboardData?.getData("text/html") || "";
+
+      // HTML이 없으면 Editor.js 기본 핸들러에 위임 (순수 텍스트)
+      if (!html.trim()) return;
+
+      // Notion 출처 판별 → 이미지 바이너리 수집
+      const isNotion = html.includes("notionvc:") || html.includes("attachment:");
+      const imageFiles: File[] = [];
+      if (isNotion) {
+        for (const item of Array.from(clipEvent.clipboardData?.items ?? [])) {
+          if (item.kind === "file" && item.type.startsWith("image/")) {
+            const file = item.getAsFile();
+            if (file) imageFiles.push(file);
+          }
+        }
+        // attachment: URL만 있고 바이너리도 없으며 notionvc도 없는 경우 → Editor.js에 위임
+        if (html.includes("attachment:") && imageFiles.length === 0 && !html.includes("notionvc:")) return;
       }
-    }
-  }, [uploadImage, uploadImageByUrl]);
 
-  // 리스트 아이템 백스페이스 병합 핸들러
-  // 커서가 리스트 아이템 맨 앞에 있을 때 백스페이스 → 이전 아이템과 병합 (노션 동작)
-  const handleListBackspace = useCallback((event: Event) => {
-    const keyEvent = event as KeyboardEvent;
-    if (keyEvent.key !== "Backspace") return;
+      event.preventDefault();
+      event.stopPropagation();
 
-    const editor = editorRef.current;
-    if (!editor) return;
+      const editor = editorRef.current;
+      if (!editor) return;
 
-    const selection = window.getSelection();
-    if (!selection || !selection.isCollapsed) return;
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      let imgIndex = 0;
 
-    const anchorNode = selection.anchorNode;
-    if (!anchorNode) return;
+      for (const node of Array.from(doc.body.childNodes)) {
+        // HTML 주석(notionvc 등) 스킵
+        if (node.nodeType === Node.COMMENT_NODE) continue;
 
-    // 현재 커서가 리스트 아이템 안에 있는지 확인
-    const currentItem = anchorNode.nodeType === Node.ELEMENT_NODE
-      ? (anchorNode as Element).closest(".cdx-list__item")
-      : anchorNode.parentElement?.closest(".cdx-list__item");
-    if (!currentItem) return;
+        if (node.nodeType === Node.TEXT_NODE) {
+          const text = (node.textContent ?? "").trim();
+          if (text) editor.blocks.insert("paragraph", { text });
+          continue;
+        }
+        if (!(node instanceof Element)) continue;
 
-    // 커서가 아이템 맨 앞에 있는지 확인
-    const range = selection.getRangeAt(0);
-    const itemRange = document.createRange();
-    itemRange.selectNodeContents(currentItem);
-    itemRange.setEnd(range.startContainer, range.startOffset);
-    if (itemRange.toString().length > 0) return;
+        const tag = node.tagName.toLowerCase();
 
-    // 이전 형제 li가 있으면 병합
-    const prevItem = currentItem.previousElementSibling;
-    if (prevItem && prevItem.classList.contains("cdx-list__item")) {
-      keyEvent.preventDefault();
-      keyEvent.stopPropagation();
+        // <hr> → delimiter 블록
+        if (tag === "hr") {
+          editor.blocks.insert("delimiter", {});
+          continue;
+        }
 
-      // 현재 아이템의 내용을 이전 아이템 끝에 붙이기
-      const currentHTML = currentItem.innerHTML;
-      const prevLength = prevItem.textContent?.length ?? 0;
+        // <img> → image 블록 (http/https URL만)
+        if (tag === "img") {
+          const src = node.getAttribute("src");
+          if (src && (src.startsWith("http:") || src.startsWith("https:"))) {
+            const result = await uploadImageByUrl(src);
+            if (result.success === 1 && "file" in result) {
+              editor.blocks.insert("image", {
+                file: { url: result.file.url },
+                caption: node.getAttribute("alt") || "",
+                withBorder: false,
+                withBackground: false,
+                stretched: false,
+              });
+            }
+          }
+          continue;
+        }
 
-      // 커서 위치를 이전 아이템의 기존 텍스트 끝으로 설정하기 위해 마커 삽입
-      const marker = document.createElement("span");
-      marker.id = "__merge_cursor";
-      prevItem.appendChild(marker);
+        if (tag === "p") {
+          // Notion attachment: 이미지가 <p> 안에 있는 경우
+          const imgEl = node.tagName === "IMG"
+            ? node
+            : node.querySelector("img[src^='attachment:']");
 
-      // 현재 아이템 내용을 이전 아이템에 병합
-      prevItem.innerHTML = prevItem.innerHTML.replace('<span id="__merge_cursor"></span>', '') + currentHTML;
-      currentItem.remove();
+          if (imgEl && imageFiles[imgIndex]) {
+            const file = imageFiles[imgIndex++];
+            const result = await uploadImage(file);
+            if (result.success === 1) {
+              editor.blocks.insert("image", {
+                file: { url: result.file.url },
+                caption: imgEl.getAttribute("alt") || "",
+                withBorder: false,
+                withBackground: false,
+                stretched: false,
+              });
+            }
+            imgEl.remove();
+            const remaining = node.innerHTML.trim();
+            if (remaining) editor.blocks.insert("paragraph", { text: remaining.replace(/\n/g, "<br>") });
+          } else {
+            // 비-Notion <img> 처리: <p> 안의 http(s) 이미지를 별도 블록으로 추출
+            const embeddedImg = node.querySelector("img");
+            if (embeddedImg) {
+              const src = embeddedImg.getAttribute("src");
+              if (src && (src.startsWith("http:") || src.startsWith("https:"))) {
+                const result = await uploadImageByUrl(src);
+                if (result.success === 1 && "file" in result) {
+                  editor.blocks.insert("image", {
+                    file: { url: result.file.url },
+                    caption: embeddedImg.getAttribute("alt") || "",
+                    withBorder: false,
+                    withBackground: false,
+                    stretched: false,
+                  });
+                }
+              }
+              embeddedImg.remove();
+            }
+            // \n → <br> 치환해 contenteditable 커서 오동작 방지
+            const content = node.innerHTML.replace(/\n/g, "<br>");
+            if (content.trim()) editor.blocks.insert("paragraph", { text: content });
+          }
+        } else if (tag === "ul" || tag === "ol") {
+          // @editorjs/list v1.10: items는 string[] (플러그인 API에 맞는 형식)
+          // :scope > li 로 직접 자식만 선택해 중첩 li 중복 방지
+          const items = Array.from(node.querySelectorAll(":scope > li"))
+            .map((li) => li.innerHTML.replace(/\n/g, "<br>"));
+          if (items.length > 0) {
+            editor.blocks.insert("list", {
+              style: tag === "ol" ? "ordered" : "unordered",
+              items,
+            });
+          }
+        } else if (/^h[1-6]$/.test(tag)) {
+          // 에디터 설정이 level 2~3만 허용하므로 클램프
+          const level = Math.min(Math.max(parseInt(tag[1]), 2), 3);
+          editor.blocks.insert("header", { text: node.innerHTML.replace(/\n/g, "<br>"), level });
+        } else {
+          // 그 외 태그 → 텍스트가 있으면 paragraph로 fallback
+          const text = node.innerHTML.replace(/\n/g, "<br>").trim();
+          if (text) editor.blocks.insert("paragraph", { text });
+        }
+      }
+    }, [uploadImage, uploadImageByUrl]);
 
-      // 커서를 병합 지점으로 이동
-      // prevLength 위치에 커서 설정
-      const setCursorAtOffset = (el: Node, offset: number) => {
-        const sel = window.getSelection()!;
-        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-        let pos = 0;
-        let textNode: Node | null = null;
-        while (walker.nextNode()) {
-          textNode = walker.currentNode;
-          const len = textNode.textContent?.length ?? 0;
-          if (pos + len >= offset) {
+    // 리스트 아이템 백스페이스 병합 핸들러
+    // 커서가 리스트 아이템 맨 앞에 있을 때 백스페이스 → 이전 아이템과 병합 (노션 동작)
+    const handleListBackspace = useCallback((event: Event) => {
+      const keyEvent = event as KeyboardEvent;
+      if (keyEvent.key !== "Backspace") return;
+
+      const editor = editorRef.current;
+      if (!editor) return;
+
+      const selection = window.getSelection();
+      if (!selection || !selection.isCollapsed) return;
+
+      const anchorNode = selection.anchorNode;
+      if (!anchorNode) return;
+
+      // 현재 커서가 리스트 아이템 안에 있는지 확인
+      const currentItem = anchorNode.nodeType === Node.ELEMENT_NODE
+        ? (anchorNode as Element).closest(".cdx-list__item")
+        : anchorNode.parentElement?.closest(".cdx-list__item");
+      if (!currentItem) return;
+
+      // 커서가 아이템 맨 앞에 있는지 확인
+      const range = selection.getRangeAt(0);
+      const itemRange = document.createRange();
+      itemRange.selectNodeContents(currentItem);
+      itemRange.setEnd(range.startContainer, range.startOffset);
+      if (itemRange.toString().length > 0) return;
+
+      // 이전 형제 li가 있으면 병합
+      const prevItem = currentItem.previousElementSibling;
+      if (prevItem && prevItem.classList.contains("cdx-list__item")) {
+        keyEvent.preventDefault();
+        keyEvent.stopPropagation();
+
+        // 현재 아이템의 내용을 이전 아이템 끝에 붙이기
+        const currentHTML = currentItem.innerHTML;
+        const prevLength = prevItem.textContent?.length ?? 0;
+
+        // 커서 위치를 이전 아이템의 기존 텍스트 끝으로 설정하기 위해 마커 삽입
+        const marker = document.createElement("span");
+        marker.id = "__merge_cursor";
+        prevItem.appendChild(marker);
+
+        // 현재 아이템 내용을 이전 아이템에 병합
+        prevItem.innerHTML = prevItem.innerHTML.replace('<span id="__merge_cursor"></span>', '') + currentHTML;
+        currentItem.remove();
+
+        // 커서를 병합 지점으로 이동
+        // prevLength 위치에 커서 설정
+        const setCursorAtOffset = (el: Node, offset: number) => {
+          const sel = window.getSelection()!;
+          const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+          let pos = 0;
+          let textNode: Node | null = null;
+          while (walker.nextNode()) {
+            textNode = walker.currentNode;
+            const len = textNode.textContent?.length ?? 0;
+            if (pos + len >= offset) {
+              const newRange = document.createRange();
+              newRange.setStart(textNode, offset - pos);
+              newRange.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+              return;
+            }
+            pos += len;
+          }
+          // offset이 전체 텍스트 길이를 초과하면 마지막에 커서
+          if (textNode) {
             const newRange = document.createRange();
-            newRange.setStart(textNode, offset - pos);
+            newRange.setStart(textNode, textNode.textContent?.length ?? 0);
             newRange.collapse(true);
             sel.removeAllRanges();
             sel.addRange(newRange);
-            return;
           }
-          pos += len;
+        };
+        setCursorAtOffset(prevItem, prevLength);
+      }
+    }, []);
+
+    useEffect(() => {
+      const holder = holderRef.current;
+      if (!holder) return;
+      holder.addEventListener("paste", handlePaste, true);
+      holder.addEventListener("keydown", handleListBackspace, true);
+      return () => {
+        holder.removeEventListener("paste", handlePaste, true);
+        holder.removeEventListener("keydown", handleListBackspace, true);
+      };
+    }, [handlePaste, handleListBackspace]);
+
+    useEffect(() => {
+      if (!holderRef.current || editorRef.current) return;
+
+      const editor = new EditorJS({
+        holder: holderRef.current,
+        placeholder: "모임을 상세하게 소개해주세요...",
+        data: initialData as any,
+        inlineToolbar: ["bold", "italic", "link"],
+        tools: {
+          alignmentBlockTune: {
+            class: AlignmentBlockTune as any,
+            config: { default: "left" },
+          },
+          imageSizeTune: {
+            class: ImageSizeTune as any,
+          },
+          paragraph: {
+            class: Paragraph as any,
+            inlineToolbar: true,
+            tunes: ["alignmentBlockTune"],
+          },
+          header: {
+            class: Header as any,
+            config: { levels: [2, 3], defaultLevel: 2 },
+            inlineToolbar: true,
+            tunes: ["alignmentBlockTune"],
+          },
+          list: {
+            class: List as any,
+            inlineToolbar: true,
+          },
+          delimiter: { class: Delimiter as any },
+          image: {
+            class: ImageTool as any,
+            config: {
+              uploader: {
+                uploadByFile: uploadImage,
+                uploadByUrl: uploadImageByUrl,
+              },
+            },
+            tunes: ["imageSizeTune"],
+          },
+        },
+        onReady: () => {
+          new Undo({ editor });
+        },
+        onChange: async () => {
+          if (editorRef.current) {
+            const data = await editorRef.current.save();
+            onChange?.(data as EditorJSContent);
+          }
+        },
+      });
+
+      editorRef.current = editor;
+
+      return () => {
+        // blob URL 전체 해제 (저장 없이 이탈 시 메모리 정리)
+        for (const url of pendingFilesRef.current.keys()) {
+          URL.revokeObjectURL(url);
         }
-        // offset이 전체 텍스트 길이를 초과하면 마지막에 커서
-        if (textNode) {
-          const newRange = document.createRange();
-          newRange.setStart(textNode, textNode.textContent?.length ?? 0);
-          newRange.collapse(true);
-          sel.removeAllRanges();
-          sel.addRange(newRange);
+        pendingFilesRef.current.clear();
+        pendingUrlsRef.current.clear();
+
+        if (editorRef.current?.destroy) {
+          editorRef.current.destroy();
+          editorRef.current = null;
         }
       };
-      setCursorAtOffset(prevItem, prevLength);
-    }
-  }, []);
+    }, []);
 
-  useEffect(() => {
-    const holder = holderRef.current;
-    if (!holder) return;
-    holder.addEventListener("paste", handlePaste, true);
-    holder.addEventListener("keydown", handleListBackspace, true);
-    return () => {
-      holder.removeEventListener("paste", handlePaste, true);
-      holder.removeEventListener("keydown", handleListBackspace, true);
-    };
-  }, [handlePaste, handleListBackspace]);
+    return (
+      <div
+        ref={holderRef}
+        className="min-h-[300px] border rounded-lg p-4 bg-white prose prose-gray max-w-none [&_.ce-block__content]:max-w-none [&_.ce-toolbar__content]:max-w-none"
+      />
+    );
+  }
+);
 
-  useEffect(() => {
-    if (!holderRef.current || editorRef.current) return;
+ContentEditor.displayName = "ContentEditor";
 
-    const editor = new EditorJS({
-      holder: holderRef.current,
-      placeholder: "모임을 상세하게 소개해주세요...",
-      data: initialData as any,
-      inlineToolbar: ["bold", "italic", "link"],
-      tools: {
-        alignmentBlockTune: {
-          class: AlignmentBlockTune as any,
-          config: { default: "left" },
-        },
-        imageSizeTune: {
-          class: ImageSizeTune as any,
-        },
-        paragraph: {
-          class: Paragraph as any,
-          inlineToolbar: true,
-          tunes: ["alignmentBlockTune"],
-        },
-        header: {
-          class: Header as any,
-          config: { levels: [2, 3], defaultLevel: 2 },
-          inlineToolbar: true,
-          tunes: ["alignmentBlockTune"],
-        },
-        list: {
-          class: List as any,
-          inlineToolbar: true,
-        },
-        delimiter: { class: Delimiter as any },
-        image: {
-          class: ImageTool as any,
-          config: {
-            uploader: {
-              uploadByFile: uploadImage,
-              uploadByUrl: uploadImageByUrl,
-            },
-          },
-          tunes: ["imageSizeTune"],
-        },
-      },
-      onReady: () => {
-        new Undo({ editor });
-      },
-      onChange: async () => {
-        if (editorRef.current) {
-          const data = await editorRef.current.save();
-          onChange?.(data as EditorJSContent);
-        }
-      },
-    });
-
-    editorRef.current = editor;
-
-    return () => {
-      if (editorRef.current?.destroy) {
-        editorRef.current.destroy();
-        editorRef.current = null;
-      }
-    };
-  }, []);
-
-  return (
-    <div
-      ref={holderRef}
-      className="min-h-[300px] border rounded-lg p-4 bg-white prose prose-gray max-w-none [&_.ce-block__content]:max-w-none [&_.ce-toolbar__content]:max-w-none"
-    />
-  );
-}
+export default ContentEditor;

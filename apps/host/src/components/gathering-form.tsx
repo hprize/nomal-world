@@ -7,6 +7,8 @@ import { updateGathering } from "@/app/actions/gathering";
 import type { Gathering, Category, EditorJSContent } from "@nomal-world/db/types";
 import dynamic from "next/dynamic";
 import { ThumbnailCropSection } from "./thumbnail-crop-section";
+import type { ContentEditorHandle } from "./content-editor";
+import type { ThumbnailCropSectionHandle } from "./thumbnail-crop-section";
 
 const ContentEditor = dynamic(() => import("./content-editor"), { ssr: false });
 
@@ -22,6 +24,8 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
   const savingRef = useRef(false); // 동기적 중복 실행 방지 가드
   const [error, setError] = useState("");
   const editorContentRef = useRef<EditorJSContent | null>(gathering?.content || null);
+  const contentEditorRef = useRef<ContentEditorHandle>(null);
+  const thumbnailSectionRef = useRef<ThumbnailCropSectionHandle>(null);
 
   const [dateTbd, setDateTbd] = useState(!gathering?.date);
   const [form, setForm] = useState({
@@ -62,10 +66,29 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
     setSaving(true);
     setError("");
 
+    // 이번 저장 시도에 업로드된 파일 경로 — DB 저장 실패 시 전부 롤백(삭제)
+    const uploadedPaths: string[] = [];
+    // DB 저장이 확정되면 롤백 금지 — 커밋된 행이 참조하는 이미지를 지우면 안 됨
+    let dbCommitted = false;
+    const supabase = createClient();
+
     try {
-      const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
+
+      // === Phase 1: 이미지 업로드 ===
+      // 각 flush는 pending(blob·File)을 정리하지 않고 업로드한 파일 경로만 반환.
+      // 저장 전체가 성공해야 commit()으로 정리 → 실패 시 재시도가 정상 동작.
+      const rawContent = editorContentRef.current;
+      let content = rawContent;
+      if (rawContent && contentEditorRef.current) {
+        const res = await contentEditorRef.current.flushPendingUploads(rawContent);
+        content = res.content;
+        uploadedPaths.push(...res.uploadedPaths);
+      }
+
+      const flushedThumbnails = await thumbnailSectionRef.current?.flushPendingUploads();
+      if (flushedThumbnails) uploadedPaths.push(...flushedThumbnails.uploadedPaths);
 
       const gatheringData = {
         title: form.title,
@@ -78,26 +101,39 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
         google_form_url: form.google_form_url || null,
         recruitment_start: form.recruitment_start ? new Date(form.recruitment_start).toISOString() : null,
         recruitment_end: form.recruitment_end ? new Date(form.recruitment_end).toISOString() : null,
-        thumbnail_url: form.thumbnail_url || null,
-        thumbnail_detail_url: form.thumbnail_detail_url || null,
-        content: editorContentRef.current,
+        thumbnail_url: (flushedThumbnails?.cardUrl ?? form.thumbnail_url) || null,
+        thumbnail_detail_url: (flushedThumbnails?.detailUrl ?? form.thumbnail_detail_url) || null,
+        content,
         status,
       };
 
+      // === Phase 2: DB 저장 ===
       if (mode === "create") {
         const { error } = await supabase
           .from("gatherings")
           .insert({ ...gatheringData, host_id: user.id });
-
         if (error) throw error;
-        router.push("/");
-        router.refresh();
       } else if (gathering) {
         await updateGathering(gathering.id, gatheringData);
-        router.push("/");
-        router.refresh();
       }
+      dbCommitted = true;
+
+      // === 성공 확정 → pending 정리 ===
+      contentEditorRef.current?.commit();
+      thumbnailSectionRef.current?.commit();
+
+      router.push("/");
+      router.refresh();
     } catch {
+      // 롤백: 이번 시도에 업로드된 파일 전부 삭제 (pending은 보존 → 재시도 시 정상 재업로드)
+      // 단, DB가 이미 커밋됐다면 그 파일들은 저장된 행이 참조하므로 절대 삭제하지 않는다.
+      if (!dbCommitted && uploadedPaths.length > 0) {
+        try {
+          await supabase.storage.from("gathering-images").remove(uploadedPaths);
+        } catch {
+          // 롤백 삭제 실패는 조용히 무시 — 사용자에겐 저장 실패만 표시
+        }
+      }
       setError("저장 중 오류가 발생했습니다.");
       // 실패 시에만 리셋 — 성공 후 router.push() 도중 버튼이 재활성화되는 것을 방지
       savingRef.current = false;
@@ -279,6 +315,7 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
           이미지를 선택한 뒤 카드용(4:3)과 상세용(16:9) 각각 크롭 영역을 지정하고 적용해주세요.
         </p>
         <ThumbnailCropSection
+          ref={thumbnailSectionRef}
           initialCardUrl={form.thumbnail_url}
           initialDetailUrl={form.thumbnail_detail_url}
           onCardChange={(url) => setForm((prev) => ({ ...prev, thumbnail_url: url }))}
@@ -290,6 +327,7 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
       <section className="bg-white rounded-xl p-6 space-y-4">
         <h2 className="font-semibold text-lg">상세 소개</h2>
         <ContentEditor
+          ref={contentEditorRef}
           initialData={gathering?.content || undefined}
           onChange={handleEditorChange}
         />
