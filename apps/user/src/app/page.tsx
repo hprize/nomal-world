@@ -5,6 +5,7 @@ import { CategoryFilter } from "@/components/category-filter";
 import { GatheringGrid } from "@/components/gathering-grid";
 import { GatheringGridSkeleton } from "@/components/gathering-grid-skeleton";
 import { Footer } from "@/components/footer";
+import { HeaderMenu } from "@/components/header-menu";
 import { createServerClient } from "@nomal-world/db/server";
 import type { HeaderButton } from "@nomal-world/db/types";
 
@@ -45,22 +46,7 @@ export default async function HomePage({
                 말도 안 되는 우리만의 세상
               </p>
             </div>
-            {headerButtons.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap justify-end">
-                {headerButtons.map((btn) => (
-                  <a
-                    key={btn.id}
-                    href={btn.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm px-4 py-2 rounded-lg font-bold text-white transition-opacity hover:opacity-80"
-                    style={{ backgroundColor: btn.color }}
-                  >
-                    {btn.label}
-                  </a>
-                ))}
-              </div>
-            )}
+            <HeaderMenu buttons={headerButtons} />
           </div>
         </div>
       </header>
