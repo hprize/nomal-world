@@ -1,16 +1,41 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@nomal-world/db/client";
 import { updateGathering } from "@/app/actions/gathering";
+import { SaveError } from "@/lib/save-error";
 import type { Gathering, Category, EditorJSContent } from "@nomal-world/db/types";
 import dynamic from "next/dynamic";
 import { ThumbnailCropSection } from "./thumbnail-crop-section";
-import type { ContentEditorHandle } from "./content-editor";
+import type { ContentEditorHandle, ContentEditorProps } from "./content-editor";
 import type { ThumbnailCropSectionHandle } from "./thumbnail-crop-section";
 
-const ContentEditor = dynamic(() => import("./content-editor"), { ssr: false });
+// next/dynamic(App Router)은 ref를 로드된 컴포넌트에 전달하지 않는다(LoadableComponent가 forwardRef가 아님).
+// ref를 그대로 넘기면 contentEditorRef.current가 항상 null이라 이미지 업로드가 조용히 건너뛰어지므로,
+// 일반 prop(editorRef)으로 받아 내부의 forwardRef 컴포넌트에 직접 연결한다.
+const ContentEditor = dynamic(
+  () =>
+    import("./content-editor").then(({ default: Editor }) => {
+      function ContentEditorWithRef({
+        editorRef,
+        ...props
+      }: ContentEditorProps & { editorRef: React.Ref<ContentEditorHandle> }) {
+        return <Editor ref={editorRef} {...props} />;
+      }
+      return ContentEditorWithRef;
+    }),
+  { ssr: false }
+);
+
+/** 업로드되지 않은 임시(blob:) 이미지가 남아 있는지 검사 — 이런 content는 절대 DB에 저장하면 안 된다 */
+function hasUnuploadedImage(content: EditorJSContent | null): boolean {
+  return (content?.blocks ?? []).some((block) => {
+    if (block.type !== "image") return false;
+    const url = (block.data as { file?: { url?: string } })?.file?.url ?? "";
+    return url.startsWith("blob:");
+  });
+}
 
 interface GatheringFormProps {
   mode: "create" | "edit";
@@ -23,7 +48,6 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false); // 동기적 중복 실행 방지 가드
   const [error, setError] = useState("");
-  const editorContentRef = useRef<EditorJSContent | null>(gathering?.content || null);
   const contentEditorRef = useRef<ContentEditorHandle>(null);
   const thumbnailSectionRef = useRef<ThumbnailCropSectionHandle>(null);
 
@@ -77,14 +101,21 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
       if (!user) throw new Error("Not authenticated");
 
       // === Phase 1: 이미지 업로드 ===
-      // 각 flush는 pending(blob·File)을 정리하지 않고 업로드한 파일 경로만 반환.
-      // 저장 전체가 성공해야 commit()으로 정리 → 실패 시 재시도가 정상 동작.
-      const rawContent = editorContentRef.current;
-      let content = rawContent;
-      if (rawContent && contentEditorRef.current) {
-        const res = await contentEditorRef.current.flushPendingUploads(rawContent);
-        content = res.content;
-        uploadedPaths.push(...res.uploadedPaths);
+      // 에디터가 저장 시점의 최신 내용을 직접 읽어 pending(blob·File)을 업로드하고 실제 URL로 교체한다.
+      // 각 flush는 pending을 정리하지 않고 업로드한 파일 경로만 반환 → 저장 전체가 성공해야 commit()으로 정리.
+      // 에디터 핸들이 없으면 조용히 건너뛰지 않고 실패시킨다 — 건너뛰면 blob: URL이 그대로 저장된다.
+      const editor = contentEditorRef.current;
+      if (!editor) {
+        throw new SaveError("에디터가 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요.");
+      }
+      const flushedContent = await editor.flushPendingUploads();
+      uploadedPaths.push(...flushedContent.uploadedPaths);
+      // 블록이 하나도 없으면 null로 저장 (DB에서 null = 소개 없음)
+      const content = flushedContent.content.blocks.length > 0 ? flushedContent.content : null;
+
+      // 마지막 방어선: 업로드되지 않은 임시 URL이 남아 있으면 DB에 쓰지 않는다
+      if (hasUnuploadedImage(content)) {
+        throw new SaveError("업로드되지 않은 이미지가 있어 저장할 수 없습니다. 이미지를 다시 첨부해주세요.");
       }
 
       const flushedThumbnails = await thumbnailSectionRef.current?.flushPendingUploads();
@@ -124,7 +155,8 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
 
       router.push("/");
       router.refresh();
-    } catch {
+    } catch (err) {
+      console.error("[gathering-form] 저장 실패", err);
       // 롤백: 이번 시도에 업로드된 파일 전부 삭제 (pending은 보존 → 재시도 시 정상 재업로드)
       // 단, DB가 이미 커밋됐다면 그 파일들은 저장된 행이 참조하므로 절대 삭제하지 않는다.
       if (!dbCommitted && uploadedPaths.length > 0) {
@@ -134,16 +166,12 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
           // 롤백 삭제 실패는 조용히 무시 — 사용자에겐 저장 실패만 표시
         }
       }
-      setError("저장 중 오류가 발생했습니다.");
+      setError(err instanceof SaveError ? err.message : "저장 중 오류가 발생했습니다.");
       // 실패 시에만 리셋 — 성공 후 router.push() 도중 버튼이 재활성화되는 것을 방지
       savingRef.current = false;
       setSaving(false);
     }
   };
-
-  const handleEditorChange = useCallback((data: EditorJSContent) => {
-    editorContentRef.current = data;
-  }, []);
 
   return (
     <div className="space-y-8">
@@ -327,9 +355,8 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
       <section className="bg-white rounded-xl p-6 space-y-4">
         <h2 className="font-semibold text-lg">상세 소개</h2>
         <ContentEditor
-          ref={contentEditorRef}
+          editorRef={contentEditorRef}
           initialData={gathering?.content || undefined}
-          onChange={handleEditorChange}
         />
       </section>
 

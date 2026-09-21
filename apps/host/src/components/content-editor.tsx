@@ -12,17 +12,20 @@ import AlignmentBlockTune from "editorjs-text-alignment-blocktune";
 import Undo from "editorjs-undo";
 import { ImageSizeTune } from "./image-size-tune";
 import { createClient } from "@nomal-world/db/client";
+import { SaveError } from "@/lib/save-error";
 import type { EditorJSContent } from "@nomal-world/db/types";
 
 export interface ContentEditorHandle {
-  // 이미지를 업로드하고 실제 URL로 교체된 content와 업로드된 파일 경로를 반환.
+  // 저장 시점에 에디터의 최신 내용을 직접 읽어(save()) pending 이미지를 업로드하고,
+  // 실제 URL로 교체된 content와 업로드된 파일 경로를 반환.
+  // (onChange 스냅샷은 Editor.js 내부 디바운스로 최신이 아닐 수 있어 여기서 직접 읽는다)
   // pending 상태(blob URL·File)는 여기서 정리하지 않음 → 저장 전체가 성공하면 commit()에서 정리.
-  flushPendingUploads: (content: EditorJSContent) => Promise<{ content: EditorJSContent; uploadedPaths: string[] }>;
+  flushPendingUploads: () => Promise<{ content: EditorJSContent; uploadedPaths: string[] }>;
   // 저장 전체 성공 확정 시 호출 — blob URL 해제 및 pending 정리
   commit: () => void;
 }
 
-interface ContentEditorProps {
+export interface ContentEditorProps {
   initialData?: EditorJSContent;
   onChange?: (data: EditorJSContent) => void;
 }
@@ -72,7 +75,14 @@ const ContentEditor = forwardRef<ContentEditorHandle, ContentEditorProps>(
     }, [uploadImage]);
 
     useImperativeHandle(ref, () => ({
-      flushPendingUploads: async (content: EditorJSContent) => {
+      flushPendingUploads: async () => {
+        const editor = editorRef.current;
+        if (!editor) {
+          throw new SaveError("에디터가 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요.");
+        }
+        await editor.isReady;
+        const content = (await editor.save()) as EditorJSContent;
+
         const supabase = createClient();
         const uploadedPaths: string[] = []; // 이번 flush에서 업로드한 파일 경로
 
@@ -90,7 +100,11 @@ const ContentEditor = forwardRef<ContentEditorHandle, ContentEditorProps>(
             // Case 1: blob URL → pendingFilesRef에서 File 꺼내 Supabase 직접 업로드
             if (url.startsWith("blob:")) {
               const file = pendingFilesRef.current.get(url);
-              if (!file) { blocks.push(block); continue; }
+              // 업로드할 원본 File이 없으면 임시 URL을 그대로 저장하지 않고 중단한다.
+              // blob: URL은 이 브라우저 세션에서만 유효하므로 DB에 남으면 깨진 이미지가 된다.
+              if (!file) {
+                throw new SaveError("첨부한 이미지 파일을 찾을 수 없습니다. 해당 이미지를 삭제한 뒤 다시 첨부해주세요.");
+              }
 
               const ext = file.name.split(".").pop();
               const fileName = `content/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
@@ -423,12 +437,15 @@ const ContentEditor = forwardRef<ContentEditorHandle, ContentEditorProps>(
         onReady: () => {
           new Undo({ editor });
         },
-        onChange: async () => {
-          if (editorRef.current) {
-            const data = await editorRef.current.save();
-            onChange?.(data as EditorJSContent);
-          }
-        },
+        // 구독자가 없으면 변경마다 save()를 돌리지 않도록 조건부 등록
+        onChange: onChange
+          ? async () => {
+              if (editorRef.current) {
+                const data = await editorRef.current.save();
+                onChange(data as EditorJSContent);
+              }
+            }
+          : undefined,
       });
 
       editorRef.current = editor;

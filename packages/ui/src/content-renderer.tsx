@@ -63,22 +63,27 @@ export function ContentRenderer({ content }: ContentRendererProps) {
             const caption = block.data.caption as string;
             const width = (block.tunes as any)?.imageSizeTune?.width as string | undefined;
             const hasSizeConstraint = width && width !== "100%";
+            // http(s) URL만 렌더링. 업로드되지 못한 임시(blob:) URL 등은 다른 브라우저에서 열 수 없어
+            // 깨진 이미지 아이콘만 남으므로 블록 자체를 건너뛴다.
+            if (typeof url !== "string" || !/^https?:\/\//.test(url)) return null;
+            // Supabase Storage 공개 URL만 next/image 최적화 대상(next.config의 remotePatterns).
+            // 그 외 호스트는 최적화 서버가 거부하므로 원본을 그대로 쓴다.
+            const isStorageUrl = url.includes("/storage/v1/object/public/");
             return (
               <figure
                 key={index}
                 className="my-6"
                 style={hasSizeConstraint ? { maxWidth: width, margin: "0 auto" } : undefined}
               >
-                {url && (
-                  <Image
-                    src={url}
-                    alt={caption || ""}
-                    width={800}
-                    height={600}
-                    sizes="(max-width: 768px) 100vw, 700px"
-                    className="w-full h-auto"
-                  />
-                )}
+                <Image
+                  src={url}
+                  alt={caption || ""}
+                  width={800}
+                  height={600}
+                  sizes="(max-width: 768px) 100vw, 700px"
+                  className="w-full h-auto"
+                  unoptimized={!isStorageUrl}
+                />
                 {caption && (
                   <figcaption className="text-center text-sm text-muted-foreground mt-2">
                     {caption}
