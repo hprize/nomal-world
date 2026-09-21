@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@nomal-world/db/client";
 import { updateGathering } from "@/app/actions/gathering";
 import { SaveError } from "@/lib/save-error";
+import { toDateTimeLocal, fromDateTimeLocal } from "@/lib/datetime";
 import type { Gathering, Category, EditorJSContent } from "@nomal-world/db/types";
 import dynamic from "next/dynamic";
 import { ThumbnailCropSection } from "./thumbnail-crop-section";
@@ -56,17 +57,14 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
     title: gathering?.title || "",
     summary: gathering?.summary || "",
     category_id: gathering?.category_id || "",
-    date: gathering?.date ? new Date(gathering.date).toISOString().slice(0, 16) : "",
+    // datetime-local 값은 KST 기준 문자열 (toISOString은 UTC라 9시간 어긋남)
+    date: toDateTimeLocal(gathering?.date),
     location: gathering?.location || "",
     capacity: gathering?.capacity?.toString() || "",
     cost: gathering?.cost?.toString() || "0",
     google_form_url: gathering?.google_form_url || "",
-    recruitment_start: gathering?.recruitment_start
-      ? new Date(gathering.recruitment_start).toISOString().slice(0, 16)
-      : "",
-    recruitment_end: gathering?.recruitment_end
-      ? new Date(gathering.recruitment_end).toISOString().slice(0, 16)
-      : "",
+    recruitment_start: toDateTimeLocal(gathering?.recruitment_start),
+    recruitment_end: toDateTimeLocal(gathering?.recruitment_end),
     thumbnail_url: gathering?.thumbnail_url || "",
     thumbnail_detail_url: gathering?.thumbnail_detail_url || "",
   });
@@ -125,13 +123,13 @@ export function GatheringForm({ mode, gathering, categories }: GatheringFormProp
         title: form.title,
         summary: form.summary || null,
         category_id: form.category_id || null,
-        date: (!dateTbd && form.date) ? new Date(form.date).toISOString() : null,
+        date: dateTbd ? null : fromDateTimeLocal(form.date),
         location: form.location || null,
         capacity: form.capacity ? parseInt(form.capacity) : null,
         cost: parseInt(form.cost) || 0,
         google_form_url: form.google_form_url || null,
-        recruitment_start: form.recruitment_start ? new Date(form.recruitment_start).toISOString() : null,
-        recruitment_end: form.recruitment_end ? new Date(form.recruitment_end).toISOString() : null,
+        recruitment_start: fromDateTimeLocal(form.recruitment_start),
+        recruitment_end: fromDateTimeLocal(form.recruitment_end),
         thumbnail_url: (flushedThumbnails?.cardUrl ?? form.thumbnail_url) || null,
         thumbnail_detail_url: (flushedThumbnails?.detailUrl ?? form.thumbnail_detail_url) || null,
         content,

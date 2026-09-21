@@ -10,10 +10,15 @@ export function formatCost(cost: number): string {
   return `${cost.toLocaleString("ko-KR")}원`;
 }
 
+// 표시 타임존 고정: 서버(Vercel = UTC)에서 렌더링해도 한국 날짜가 나오도록 한다.
+// (없으면 KST 새벽 시각이 전날 날짜로 표시됨)
+const APP_TIME_ZONE = "Asia/Seoul";
+
 export function formatDate(dateStr: string | null): string {
   if (!dateStr) return "모집 종료 후 논의";
   const date = new Date(dateStr);
   return date.toLocaleDateString("ko-KR", {
+    timeZone: APP_TIME_ZONE,
     month: "long",
     day: "numeric",
     weekday: "short",
@@ -25,7 +30,7 @@ export function formatRecruitmentPeriod(
   end: string | null
 ): string {
   const fmt = (d: string) =>
-    new Date(d).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" });
+    new Date(d).toLocaleDateString("ko-KR", { timeZone: APP_TIME_ZONE, month: "numeric", day: "numeric" });
   if (start && end) return `${fmt(start)} ~ ${fmt(end)}`;
   if (end) return `~ ${fmt(end)}`;
   if (start) return `${fmt(start)} ~`;
