@@ -30,6 +30,25 @@ export interface ContentEditorProps {
   onChange?: (data: EditorJSContent) => void;
 }
 
+/**
+ * ImageTool의 미리보기 생성이 끝날 때까지 기다린다.
+ *
+ * ImageTool은 uploadByFile()을 부르기 직전에 같은 파일을 FileReader로 읽어(비동기) 미리보기를 띄운다
+ * (showPreloader → 상태 'uploading'). 우리는 실제 업로드 없이 blob URL을 곧바로 돌려주므로,
+ * 그 미리보기보다 <img> load가 먼저 끝나면 뒤늦게 실행된 showPreloader가 상태를 다시
+ * 'uploading'으로 덮어써 스피너가 영원히 남는다(작은 파일일수록 잘 재현됨).
+ * 같은 파일을 한 번 더 읽으면 먼저 시작된 ImageTool의 읽기가 끝난 뒤에 완료되므로
+ * "미리보기 → 이미지 표시" 순서가 보장된다.
+ */
+function waitForImageToolPreview(file: File): Promise<void> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    // 성공/실패와 무관하게 진행. setTimeout(0)으로 ImageTool의 onload 핸들러가 먼저 실행될 여지를 한 번 더 둔다
+    reader.onloadend = () => setTimeout(resolve, 0);
+    reader.readAsDataURL(file);
+  });
+}
+
 const ContentEditor = forwardRef<ContentEditorHandle, ContentEditorProps>(
   ({ initialData, onChange }, ref) => {
     const editorRef = useRef<EditorJS | null>(null);
@@ -38,6 +57,7 @@ const ContentEditor = forwardRef<ContentEditorHandle, ContentEditorProps>(
     const pendingUrlsRef = useRef<Set<string>>(new Set());        // 외부 http(s) URL
 
     const uploadImage = useCallback(async (file: File) => {
+      await waitForImageToolPreview(file);
       const blobUrl = URL.createObjectURL(file);
       pendingFilesRef.current.set(blobUrl, file);
       return { success: 1, file: { url: blobUrl } };

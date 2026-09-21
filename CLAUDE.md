@@ -139,6 +139,10 @@ Supabase에 올리지 않고, **폼을 실제로 저장할 때** 한꺼번에 �
   (`onChange` 스냅샷은 Editor.js 디바운스로 뒤처질 수 있음). pending File이 없는 `blob:` URL이 있으면
   `SaveError`(`src/lib/save-error.ts`, 사용자에게 그대로 보여주는 한국어 메시지)를 던져 저장을 중단합니다
 - 업로드 전에는 `blob:` URL과 `File`/`Blob`을 메모리(ref)에 보관
+- **ImageTool 미리보기 경쟁 조건**: ImageTool은 `uploadByFile()` 직전에 FileReader로 미리보기를 비동기 생성하는데,
+  지연 업로더는 즉시 resolve하므로 `<img>` load가 미리보기보다 먼저 끝나면 뒤늦은 `showPreloader`가 상태를
+  `uploading`으로 되돌려 스피너가 영원히 남습니다. `uploadImage`는 같은 파일을 한 번 더 읽어(`waitForImageToolPreview`)
+  미리보기가 끝난 뒤 resolve합니다 — 이 대기를 제거하면 안 됩니다
 - 저장 흐름(`gathering-form.tsx`의 `handleSave`)은 **2단계**:
   1. **Phase 1 (upload)**: 두 컴포넌트의 `flushPendingUploads()`로 업로드, 경로 누적. 이때 pending은 정리하지 않음
   2. **Phase 2 (DB 저장)** 성공 시 `commit()`으로 정리, 실패 시 이번에 올린 파일을 전부 `remove()`로 롤백(pending은 보존 → 재시도 정상)
@@ -147,6 +151,15 @@ Supabase에 올리지 않고, **폼을 실제로 저장할 때** 한꺼번에 �
   `unoptimized`로 원본을 그대로 씁니다(`remotePatterns` 밖 호스트가 최적화 서버에서 거부되는 것을 방지)
 - 편집 모드 저장(`updateGathering`)은 DB 업데이트 **성공 후에만** 교체된 옛 이미지를 삭제하며,
   그 삭제는 best-effort(실패해도 throw하지 않음)로 처리해 커밋된 행이 깨진 이미지를 참조하지 않도록 합니다
+
+### 날짜·시간 (KST 고정)
+
+폼의 `datetime-local` 값과 화면 표시는 **Asia/Seoul 기준으로 고정**합니다.
+`apps/host/src/lib/datetime.ts`의 `toDateTimeLocal()`(ISO → 입력값)·`fromDateTimeLocal()`(입력값 → ISO)을 쓰고,
+`packages/ui`의 `formatDate()`/`formatRecruitmentPeriod()`는 `timeZone: "Asia/Seoul"`로 렌더링합니다.
+서버(Vercel = UTC)와 브라우저 타임존에 관계없이 같은 문자열이 나오므로 SSR 하이드레이션도 일치합니다.
+`new Date(iso).toISOString().slice(0, 16)`을 datetime-local에 넣으면 UTC 값이라 9시간 어긋나고,
+그대로 재저장하면 매번 9시간씩 밀리므로 쓰지 마세요.
 
 ### 스토리지
 
