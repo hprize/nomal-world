@@ -124,16 +124,27 @@ Supabase Auth + `@supabase/ssr` 기반. 인증이 필요한 앱(`host`, `admin`)
 `ContentEditor`는 브라우저 전용이라 `dynamic(..., { ssr: false })`로 로드하고,
 렌더링은 `@nomal-world/ui`의 `ContentRenderer`가 담당합니다.
 
+> **`next/dynamic`은 App Router에서 `ref`를 전달하지 않습니다.** 반환되는 `LoadableComponent`가
+> `forwardRef`가 아니라서 `<ContentEditor ref={...}>`로 넘긴 ref는 항상 `null`입니다(과거 이 때문에
+> 업로드가 조용히 건너뛰어져 `blob:` URL이 DB에 저장되는 버그가 있었음). 그래서 `gathering-form.tsx`는
+> 로더 안에서 `editorRef` **prop**을 받아 내부 `forwardRef` 컴포넌트에 연결하는 래퍼를 반환합니다.
+
 **이미지 지연 업로드(deferred upload) 아키텍처** — 이미지를 선택/붙여넣기하는 즉시
 Supabase에 올리지 않고, **폼을 실제로 저장할 때** 한꺼번에 업로드합니다.
 저장하지 않고 이탈한 이미지가 스토리지에 고아(orphan) 파일로 쌓이는 것을 방지하기 위함입니다.
 
 - `content-editor.tsx` / `thumbnail-crop-section.tsx`는 `forwardRef`로
   `flushPendingUploads()`(업로드 실행 + 업로드 경로 반환)와 `commit()`(성공 확정 시 정리)을 노출
+- `ContentEditor.flushPendingUploads()`는 저장 시점에 `editor.save()`로 **최신 내용을 직접 읽습니다**
+  (`onChange` 스냅샷은 Editor.js 디바운스로 뒤처질 수 있음). pending File이 없는 `blob:` URL이 있으면
+  `SaveError`(`src/lib/save-error.ts`, 사용자에게 그대로 보여주는 한국어 메시지)를 던져 저장을 중단합니다
 - 업로드 전에는 `blob:` URL과 `File`/`Blob`을 메모리(ref)에 보관
 - 저장 흐름(`gathering-form.tsx`의 `handleSave`)은 **2단계**:
   1. **Phase 1 (upload)**: 두 컴포넌트의 `flushPendingUploads()`로 업로드, 경로 누적. 이때 pending은 정리하지 않음
   2. **Phase 2 (DB 저장)** 성공 시 `commit()`으로 정리, 실패 시 이번에 올린 파일을 전부 `remove()`로 롤백(pending은 보존 → 재시도 정상)
+  - 에디터 핸들이 없거나 content에 `blob:` URL이 남아 있으면 **저장하지 않고 실패**시킵니다(조용한 건너뛰기 금지)
+- `ContentRenderer`는 `http(s)` URL인 image 블록만 렌더링하고, Supabase Storage 공개 URL이 아닌 호스트는
+  `unoptimized`로 원본을 그대로 씁니다(`remotePatterns` 밖 호스트가 최적화 서버에서 거부되는 것을 방지)
 - 편집 모드 저장(`updateGathering`)은 DB 업데이트 **성공 후에만** 교체된 옛 이미지를 삭제하며,
   그 삭제는 best-effort(실패해도 throw하지 않음)로 처리해 커밋된 행이 깨진 이미지를 참조하지 않도록 합니다
 
